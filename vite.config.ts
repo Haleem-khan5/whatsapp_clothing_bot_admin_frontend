@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
+// Removed lovable-tagger to eliminate Lovable branding in dev builds
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -17,7 +17,16 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  preview: {
+    host: "::", // listen on all interfaces
+    port: 3000,
+    // Allow Render preview host(s)
+    allowedHosts: [
+      /\\.onrender\\.com$/,
+      "whatsapp-clothing-bot-admin-frontend.onrender.com",
+    ],
+  },
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

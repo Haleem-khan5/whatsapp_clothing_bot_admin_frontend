@@ -4,7 +4,14 @@ import axios from 'axios';
 // Examples:
 // VITE_SERVER_URL=http://localhost:8000
 // VITE_SERVER_URL=https://api.example.com/api
-const envBase = (import.meta as any)?.env?.VITE_SERVER_URL as string | undefined;
+const rawEnvBase = (import.meta as any)?.env?.VITE_SERVER_URL as string | undefined;
+// Sanitize and normalize base URL:
+// - strip leading/trailing whitespace
+// - remove any accidental leading '@'
+// - remove trailing slashes
+// - if empty/undefined, fallback to '/api'
+let envBase = (rawEnvBase || '').trim();
+if (envBase.startsWith('@')) envBase = envBase.slice(1);
 const baseURL = (envBase || '/api').replace(/\/+$/, '');
 
 export const api = axios.create({

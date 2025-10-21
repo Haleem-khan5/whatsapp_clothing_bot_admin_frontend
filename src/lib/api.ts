@@ -12,10 +12,21 @@ const rawEnvBase = (import.meta as any)?.env?.VITE_SERVER_URL as string | undefi
 // - if empty/undefined, fallback to '/api'
 let envBase = (rawEnvBase || '').trim();
 if (envBase.startsWith('@')) envBase = envBase.slice(1);
-const baseURL = (envBase || '/api').replace(/\/+$/, '');
+const sanitized = (envBase || '/api').replace(/\/+$/, '');
+const isAbsolute = /^https?:\/\//i.test(sanitized);
 
+// Debug: show what Vite injected and what we resolved to
+try {
+  // eslint-disable-next-line no-console
+  console.info('[API] VITE_SERVER_URL (raw):', rawEnvBase);
+  // eslint-disable-next-line no-console
+  console.info('[API] Resolved API base:', isAbsolute ? sanitized : `(relative) ${sanitized}`);
+} catch {}
+
+// If absolute, let axios handle it. If relative (e.g. '/api'),
+// we will prefix requests in an interceptor so callers can use '/auth/...'.
 export const api = axios.create({
-  baseURL,
+  baseURL: isAbsolute ? sanitized : '',
 });
 
 // Request interceptor to add JWT token
@@ -23,6 +34,14 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('jwt');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // Prefix relative API calls with '/api' in dev/proxy mode
+  if (!isAbsolute) {
+    const url = config.url || '';
+    if (!/^https?:\/\//i.test(url)) {
+      const path = url.startsWith('/') ? url : `/${url}`;
+      config.url = `${sanitized}${path}`; // e.g. '/api' + '/auth/login'
+    }
   }
   return config;
 });

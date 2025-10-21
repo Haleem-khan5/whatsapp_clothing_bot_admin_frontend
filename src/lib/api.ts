@@ -4,13 +4,17 @@ import axios from 'axios';
 // Examples:
 // VITE_SERVER_URL=http://localhost:8000
 // VITE_SERVER_URL=https://api.example.com/api
-const rawEnvBase = (import.meta as any)?.env?.VITE_SERVER_URL as string | undefined;
+// Read from Vite env (must be prefixed with VITE_), allow window override for non-Vite embedders
+const rawEnvBase: string | undefined =
+  ((typeof import.meta !== 'undefined' && (import.meta as any)?.env?.VITE_SERVER_URL) as string | undefined) ||
+  ((typeof window !== 'undefined' && (window as any).__API_BASE__) as string | undefined) ||
+  undefined;
 // Sanitize and normalize base URL:
 // - strip leading/trailing whitespace
 // - remove any accidental leading '@'
 // - remove trailing slashes
 // - if empty/undefined, fallback to '/api'
-let envBase = (rawEnvBase || '').trim();
+let envBase = "https://clothing-bot-uw4d.onrender.com";
 if (envBase.startsWith('@')) envBase = envBase.slice(1);
 const sanitized = (envBase || '/api').replace(/\/+$/, '');
 const isAbsolute = /^https?:\/\//i.test(sanitized);

@@ -78,21 +78,41 @@ export default function Downloads() {
         from_ts: method === 'custom_range' ? new Date(fromTs).toISOString() : undefined,
         to_ts: method === 'custom_range' ? new Date(toTs).toISOString() : undefined,
       });
+      const files = (resp?.data as any)?.files as { url: string; filename: string }[] | undefined;
       const urls = resp?.data?.urls || [];
-      if (urls.length === 0) {
+      const hasFiles = Array.isArray(files) && files.length > 0;
+      const total = hasFiles ? files!.length : urls.length;
+      if (total === 0) {
         toast({ title: 'No images to download', description: 'No images matched the selected method.' });
       } else {
-        // Sequentially trigger downloads in-order
-        for (let i = 0; i < urls.length; i++) {
-          const a = document.createElement('a');
-          a.href = urls[i];
-          a.download = '';
-          a.target = '_blank';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
+        // Prefer using files (with filenames). Fallback to plain URLs.
+        if (hasFiles) {
+          for (const f of files!) {
+            try {
+              const res = await fetch(f.url, { credentials: 'include' });
+              const blob = await res.blob();
+              const objectUrl = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = objectUrl;
+              a.download = f.filename || '';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(objectUrl);
+            } catch {}
+          }
+        } else {
+          for (let i = 0; i < urls.length; i++) {
+            const a = document.createElement('a');
+            a.href = urls[i];
+            a.download = '';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          }
         }
-        toast({ title: 'Downloads started', description: `${urls.length} files are downloading.` });
+        toast({ title: 'Downloads started', description: `${total} files are downloading.` });
       }
       refetch();
     } catch (e: any) {

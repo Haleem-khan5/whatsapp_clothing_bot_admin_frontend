@@ -14,6 +14,11 @@ export interface DownloadRecord {
   created_at: string;
 }
 
+export interface DownloadFileDescriptor {
+  url: string;
+  filename: string;
+}
+
 export interface ListDownloadsParams {
   page?: number;
   page_size?: number;
@@ -43,7 +48,10 @@ export function useCreateDownload() {
   return useMutation({
     mutationFn: async (payload: CreateDownloadInput) => {
       const response = await api.post('/downloads', payload);
-      return response.data as { ok: boolean; data: { download_id: string; urls?: string[] } };
+      return response.data as {
+        ok: boolean;
+        data: { download_id: string; files?: DownloadFileDescriptor[]; urls?: string[] };
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['downloads'] });

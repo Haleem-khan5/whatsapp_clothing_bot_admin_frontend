@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -29,12 +29,39 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
       max_images_per_hour: 100,
       max_images_per_msg: 10,
       is_paused: false,
+      credit_remaining_egp: 0,
     }
   );
 
   const createStore = useCreateStore();
   const updateStore = useUpdateStore();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!open) return;
+    if (store) {
+      setFormData({
+        id: store.id,
+        store_name: store.store_name,
+        store_kind: store.store_kind,
+        address: store.address,
+        max_images_per_hour: store.max_images_per_hour,
+        max_images_per_msg: store.max_images_per_msg,
+        is_paused: !!store.is_paused,
+        credit_remaining_egp: store.credit_remaining_egp ?? 0,
+      });
+    } else {
+      setFormData({
+        store_name: '',
+        store_kind: 'Market',
+        address: '',
+        max_images_per_hour: 100,
+        max_images_per_msg: 10,
+        is_paused: false,
+        credit_remaining_egp: 0,
+      });
+    }
+  }, [open, store?.id, store?.store_name, store?.store_kind, store?.address, store?.max_images_per_hour, store?.max_images_per_msg, store?.is_paused, store?.credit_remaining_egp]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,6 +141,31 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
               value={formData.address || ''}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="credit_remaining_egp">Remaining Credit (EGP)</Label>
+              <Input
+                id="credit_remaining_egp"
+                type="number"
+                min={0}
+                step="0.01"
+                value={formData.credit_remaining_egp ?? 0}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    credit_remaining_egp: Number(e.target.value),
+                  })
+                }
+              />
+            </div>
+            {typeof store?.remaining_quota_images !== 'undefined' && (
+              <div className="space-y-2">
+                <Label htmlFor="remaining_quota_images">Remaining Quota (images)</Label>
+                <Input id="remaining_quota_images" value={store?.remaining_quota_images ?? 0} readOnly />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

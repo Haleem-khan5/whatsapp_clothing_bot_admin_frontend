@@ -10,6 +10,8 @@ export interface Store {
   max_images_per_hour: number;
   max_images_per_msg: number;
   is_paused?: boolean;
+  credit_remaining_egp?: number;
+  remaining_quota_images?: number;
   shopify_collection_handle?: string;
   shopify_collection_id?: string;
   shopify_storefront_url?: string;

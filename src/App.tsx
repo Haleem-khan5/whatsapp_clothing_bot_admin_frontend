@@ -20,6 +20,7 @@ import Phones from "./pages/Phones";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import ErrorLogs from "./pages/ErrorLogs";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/transactions" element={<Transactions />} />
               <Route path="/refunds" element={<Refunds />} />
               <Route path="/downloads" element={<Downloads />} />
+              <Route path="/error-logs" element={<ErrorLogs />} />
               <Route path="/catalogs/credit" element={<CreditCatalog />} />
               <Route path="/catalogs/payment-for" element={<PaymentFor />} />
               <Route path="/catalogs/payment-method" element={<PaymentMethod />} />

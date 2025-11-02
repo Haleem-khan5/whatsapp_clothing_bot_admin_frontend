@@ -11,6 +11,7 @@ import {
   Phone,
   Users,
   Settings,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -33,6 +34,7 @@ const mainItems = [
   { title: 'Transactions', url: '/transactions', icon: Receipt },
   { title: 'Refunds', url: '/refunds', icon: RotateCcw },
   { title: 'Downloads', url: '/downloads', icon: Download },
+  { title: 'Error Logs', url: '/error-logs', icon: AlertTriangle },
 ];
 
 const catalogItems = [

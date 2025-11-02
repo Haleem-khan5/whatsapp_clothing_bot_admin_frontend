@@ -3,7 +3,7 @@ import { DataTable, Column } from '@/components/DataTable';
 import { Button } from '@/components/ui/button';
 import { Plus, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTransactions } from '@/hooks/useTransactions';
+import { useTransactions, useDeleteTransaction } from '@/hooks/useTransactions';
 import { useStores } from '@/hooks/useStores';
 import { usePaymentFor, usePaymentMethod } from '@/hooks/useLookups';
 import { useUsers } from '@/hooks/useUsers';
@@ -12,6 +12,17 @@ import { Input } from '@/components/ui/input';
 import { TransactionDialog } from '@/components/TransactionDialog';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function Transactions() {
   const [filters, setFilters] = useState({ page: 1, page_size: 20 });
@@ -51,6 +62,12 @@ export default function Transactions() {
   }, [usersResp]);
   const params = useMemo(() => ({ store_id: storeId, from, to }), [storeId, from, to]);
   const { data, refetch } = useTransactions(params);
+  const deleteTxn = useDeleteTransaction();
+  const { toast } = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [targetTxn, setTargetTxn] = useState<any>(null);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const rows = (data?.data || []).map((t: any) => ({
     id: t.txn_id,
@@ -63,9 +80,25 @@ export default function Transactions() {
     received_by: userIdToName.get(t.received_by) || t.received_by,
   }));
 
-  const filteredRows = rows.filter((r: any) =>
+  let filteredRows = rows.filter((r: any) =>
     (r.store_name || '').toLowerCase().includes(search.toLowerCase())
   );
+  if (sortKey) {
+    filteredRows = [...filteredRows].sort((a: any, b: any) => {
+      const va = a[sortKey as any];
+      const vb = b[sortKey as any];
+      const dir = sortDir === 'asc' ? 1 : -1;
+      const numA = typeof va === 'number' ? va : (typeof va === 'string' && va.trim() !== '' && !isNaN(Number(va)) ? Number(va) : NaN);
+      const numB = typeof vb === 'number' ? vb : (typeof vb === 'string' && vb.trim() !== '' && !isNaN(Number(vb)) ? Number(vb) : NaN);
+      if (Number.isFinite(numA) && Number.isFinite(numB)) return (numA - numB) * dir;
+      const da = typeof va === 'string' ? Date.parse(va) : NaN;
+      const db = typeof vb === 'string' ? Date.parse(vb) : NaN;
+      if (Number.isFinite(da) && Number.isFinite(db)) return (da - db) * dir;
+      return String(va ?? '').toLowerCase().localeCompare(String(vb ?? '').toLowerCase()) * dir;
+    });
+  }
+
+  const totalVisible = filteredRows.reduce((acc: number, r: any) => acc + Number(r.amount_egp || 0), 0);
 
   const columns: Column<any>[] = [
     { key: 'txn_date', label: '📅 Date', sortable: true },
@@ -94,6 +127,22 @@ export default function Transactions() {
         ),
     },
     { key: 'received_by', label: '👤 Received By' },
+    ...(isAdmin
+      ? [{
+          key: 'actions',
+          label: '',
+          render: (row: any) => (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-600 hover:bg-red-50"
+              onClick={() => { setTargetTxn(row); setConfirmOpen(true); }}
+            >
+              Delete
+            </Button>
+          ),
+        }] as Column<any>[]
+      : []),
   ];
 
   return (
@@ -204,12 +253,17 @@ export default function Transactions() {
 
         <CardContent>
           <div className="rounded-xl overflow-hidden border border-purple-100 shadow-sm bg-white/70 backdrop-blur-sm">
+            <div className="flex items-center justify-between px-4 py-2 text-sm text-purple-700">
+              <div><span className="font-semibold">Total (visible):</span> {totalVisible.toFixed(2)} EGP</div>
+              <div className="text-purple-500">Rows: {filteredRows.length}</div>
+            </div>
             <DataTable
               columns={columns}
               data={filteredRows}
               currentPage={filters.page}
               totalPages={1}
               onPageChange={(page) => setFilters({ ...filters, page })}
+              onSort={(key, direction) => { setSortKey(key); setSortDir(direction); }}
               searchable={false}
               rowClassName="hover:bg-purple-50/80 transition-colors"
             />
@@ -224,6 +278,38 @@ export default function Transactions() {
           if (!o) refetch();
         }}
       />
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the transaction {targetTxn?.id}. If the store has used part of this top-up, deletion will be blocked.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!targetTxn) return;
+                try {
+                  await deleteTxn.mutateAsync(targetTxn.id);
+                  toast({ title: 'Transaction deleted', description: `${targetTxn.id} was deleted.` });
+                  refetch();
+                } catch (e: any) {
+                  const msg = e?.response?.data?.message || 'Could not delete transaction.';
+                  toast({ title: 'Delete failed', description: msg, variant: 'destructive' });
+                } finally {
+                  setConfirmOpen(false);
+                  setTargetTxn(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Plus, MoreHorizontal, Building2, Search } from 'lucide-react';
-import { useStores } from '@/hooks/useStores';
+import { useStores, useUpdateStore, useDeleteStore } from '@/hooks/useStores';
+import { useToast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,16 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
@@ -30,8 +41,17 @@ export default function Stores() {
   const [selectedColumn, setSelectedColumn] = useState<'store_name' | 'store_kind' | 'address'>(
     'store_name'
   );
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<any>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const { data } = useStores();
+  const updateStore = useUpdateStore();
+  const deleteStore = useDeleteStore();
+  const { toast } = useToast();
 
   // Map and filter data
   const stores = (data?.data || []).map((s: any) => ({
@@ -45,15 +65,69 @@ export default function Stores() {
     is_paused: s.is_paused,
     credit_remaining_egp: s.credit_remaining_egp,
     remaining_quota_images: s.remaining_quota_images,
+    total_top_ups_egp: s.total_top_ups_egp,
+    image_jobs_count: s.image_jobs_count,
+    video_jobs_count: s.video_jobs_count,
+    last_active_at: s.last_active_at,
+    whatsapp_numbers_count: s.whatsapp_numbers_count,
+    refunded_jobs_count: s.refunded_jobs_count,
   }));
 
-  const filteredStores = stores.filter((store) =>
+  let filteredStores = stores.filter((store) =>
     store[selectedColumn]?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Apply sorting locally
+  if (sortKey) {
+    filteredStores = [...filteredStores].sort((a: any, b: any) => {
+      const va = a[sortKey];
+      const vb = b[sortKey];
+      const dir = sortDir === 'asc' ? 1 : -1;
+      // Numeric sort if both numbers or numeric-like strings
+      const numA = typeof va === 'number' ? va : (typeof va === 'string' && va.trim() !== '' && !isNaN(Number(va)) ? Number(va) : NaN);
+      const numB = typeof vb === 'number' ? vb : (typeof vb === 'string' && vb.trim() !== '' && !isNaN(Number(vb)) ? Number(vb) : NaN);
+      if (Number.isFinite(numA) && Number.isFinite(numB)) {
+        return (numA - numB) * dir;
+      }
+      // Boolean: false < true
+      if (typeof va === 'boolean' && typeof vb === 'boolean') {
+        return ((va === vb ? 0 : va ? 1 : -1) as number) * dir;
+      }
+      // Date strings: try Date compare
+      const da = typeof va === 'string' ? Date.parse(va) : NaN;
+      const db = typeof vb === 'string' ? Date.parse(vb) : NaN;
+      if (Number.isFinite(da) && Number.isFinite(db)) {
+        return (da - db) * dir;
+      }
+      // Alphabetical (case-insensitive)
+      const sa = String(va ?? '').toLowerCase();
+      const sb = String(vb ?? '').toLowerCase();
+      return sa.localeCompare(sb) * dir;
+    });
+  }
 
   const handleEdit = (store: any) => {
     setSelectedStore(store);
     setDialogOpen(true);
+  };
+
+  const handleTogglePause = async (store: any) => {
+    try {
+      await updateStore.mutateAsync({ id: store.id, data: { is_paused: !store.is_paused } });
+      toast({
+        title: store.is_paused ? 'Store resumed' : 'Store paused',
+        description: `${store.store_name} is now ${store.is_paused ? 'Active' : 'Paused'}.`,
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Update failed',
+        description: e?.response?.data?.message || 'Could not update store status.',
+        variant: 'destructive',
+      });
+    } finally {
+      setConfirmOpen(false);
+      setConfirmTarget(null);
+    }
   };
 
   const handleAddNew = () => {
@@ -65,11 +139,40 @@ export default function Stores() {
     { key: 'store_name', label: '🏪 Store Name', sortable: true },
     { key: 'store_kind', label: '🏷️ Type', sortable: true },
     { key: 'address', label: '📍 Address' },
-    { key: 'registration_date', label: '🗓️ Registered On', sortable: true },
+    {
+      key: 'registration_date',
+      label: '🗓️ Registered On',
+      sortable: true,
+      render: (row) => {
+        const d = row.registration_date ? new Date(row.registration_date) : null;
+        return d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '-';
+      },
+    },
     { key: 'max_images_per_hour', label: '⚡ Max/Hr', sortable: true },
     { key: 'max_images_per_msg', label: '🖼️ Max/Msg', sortable: true },
     { key: 'credit_remaining_egp', label: '💳 Credit Remaining (EGP)', sortable: true },
     { key: 'remaining_quota_images', label: '🖼️ Remaining Quota (images)', sortable: true },
+    { key: 'total_top_ups_egp', label: '💰 Top Ups (EGP)', sortable: true },
+    { key: 'image_jobs_count', label: '🖼️ Image Jobs', sortable: true },
+    { key: 'video_jobs_count', label: '🎞️ Video Jobs', sortable: true },
+    {
+      key: 'last_active_at',
+      label: '🕒 Last Active (EG)',
+      sortable: true,
+      render: (row) =>
+        row.last_active_at
+          ? new Date(row.last_active_at).toLocaleString('en-EG', {
+              timeZone: 'Africa/Cairo',
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+    { key: 'whatsapp_numbers_count', label: '# WhatsApp Numbers', sortable: true },
+    { key: 'refunded_jobs_count', label: '↩️ Refunded Jobs', sortable: true },
     {
       key: 'is_paused',
       label: 'Status',
@@ -107,10 +210,10 @@ export default function Stores() {
               Edit
             </DropdownMenuItem>
             <DropdownMenuItem className="hover:bg-indigo-50">View Numbers</DropdownMenuItem>
-            <DropdownMenuItem className="hover:bg-indigo-50">
+            <DropdownMenuItem onClick={() => { setConfirmTarget(row); setConfirmOpen(true); }} className="hover:bg-indigo-50">
               {row.is_paused ? 'Resume' : 'Pause'}
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600 hover:bg-red-50">Delete</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setDeleteTarget(row); setDeleteOpen(true); }} className="text-red-600 hover:bg-red-50">Delete</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -201,6 +304,7 @@ export default function Stores() {
               columns={columns}
               data={filteredStores}
               searchable={false} // ✅ disables inner search bar
+              onSort={(key, direction) => { setSortKey(key); setSortDir(direction); }}
               rowClassName="hover:bg-indigo-50/80 transition-colors"
             />
           </div>
@@ -209,6 +313,61 @@ export default function Stores() {
 
       {/* DIALOG */}
       <StoreDialog open={dialogOpen} onOpenChange={setDialogOpen} store={selectedStore} />
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmTarget?.is_paused ? 'Resume store?' : 'Pause store?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmTarget?.is_paused
+                ? `Resuming ${confirmTarget?.store_name} will allow processing pictures again.`
+                : `Pausing ${confirmTarget?.store_name} will immediately stop processing any new pictures.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmTarget && handleTogglePause(confirmTarget)}>
+              {confirmTarget?.is_paused ? 'Resume' : 'Pause'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete store?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove {deleteTarget?.store_name} from the list. You can’t undo this.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!deleteTarget) return;
+                try {
+                  await deleteStore.mutateAsync(deleteTarget.id);
+                  toast({ title: 'Store deleted', description: `${deleteTarget.store_name} was deleted.` });
+                } catch (e: any) {
+                  toast({
+                    title: 'Delete failed',
+                    description: e?.response?.data?.message || 'Could not delete store.',
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setDeleteOpen(false);
+                  setDeleteTarget(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

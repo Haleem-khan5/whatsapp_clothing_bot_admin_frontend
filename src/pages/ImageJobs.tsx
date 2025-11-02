@@ -15,6 +15,8 @@ export default function ImageJobs() {
   });
 
   const { data, isLoading } = useImageJobs(filters);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const { data: storesResp } = useStores();
   const storeIdToName = useMemo(() => {
     const stores = (storesResp?.data || []).map((s: any) => ({ id: s.store_id, name: s.store_name }));
@@ -31,10 +33,53 @@ export default function ImageJobs() {
     }));
   }, [data?.data, storeIdToName]);
 
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows;
+    const arr = [...rows];
+    arr.sort((a: any, b: any) => {
+      const va = a[sortKey as any];
+      const vb = b[sortKey as any];
+      const dir = sortDir === 'asc' ? 1 : -1;
+      // Numeric sort (numbers or numeric-like strings)
+      const numA = typeof va === 'number' ? va : (typeof va === 'string' && va.trim() !== '' && !isNaN(Number(va)) ? Number(va) : NaN);
+      const numB = typeof vb === 'number' ? vb : (typeof vb === 'string' && vb.trim() !== '' && !isNaN(Number(vb)) ? Number(vb) : NaN);
+      if (Number.isFinite(numA) && Number.isFinite(numB)) {
+        return (numA - numB) * dir;
+      }
+      // Date strings
+      const da = typeof va === 'string' ? Date.parse(va) : NaN;
+      const db = typeof vb === 'string' ? Date.parse(vb) : NaN;
+      if (Number.isFinite(da) && Number.isFinite(db)) {
+        return (da - db) * dir;
+      }
+      // Alphabetical
+      const sa = String(va ?? '').toLowerCase();
+      const sb = String(vb ?? '').toLowerCase();
+      return sa.localeCompare(sb) * dir;
+    });
+    return arr;
+  }, [rows, sortKey, sortDir]);
+
   const columns: Column<any>[] = [
     { key: 'job_id', label: '🆔 Job ID', sortable: true },
     { key: 'store_name', label: '🏪 Store', sortable: true },
-    { key: 'timestamp', label: '⏱ Timestamp', sortable: true },
+    {
+      key: 'timestamp',
+      label: '⏱ Timestamp (EG)',
+      sortable: true,
+      render: (row) =>
+        row.timestamp
+          ? new Date(row.timestamp).toLocaleString('en-EG', {
+              timeZone: 'Africa/Cairo',
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })
+          : '-',
+    },
     {
       key: 'original_file_url',
       label: '📷 Original',
@@ -93,22 +138,25 @@ export default function ImageJobs() {
         ),
     },
     { key: 'processing_time_sec', label: '⚙️ Processing Time (s)', sortable: true },
-    { key: 'my_cost_egp', label: '💰 Cost (EGP)', sortable: true },
+    { key: 'tokens_used', label: '🔢 Tokens Used', sortable: true },
+    { key: 'cost_per_token_usd', label: '💵 Cost/Token (USD)', sortable: true },
+    { key: 'usd_to_egp', label: '💱 USD/EGP', sortable: true },
+    { key: 'my_cost_egp', label: '💰 My Cost (EGP)', sortable: true },
     {
       key: 'status_front',
       label: '📦 Front Status',
       render: (row) => (
         <Badge
-          variant={row.status_front === 'completed' ? 'default' : row.status_front === 'failed' ? 'destructive' : 'secondary'}
+          variant={row.status_front === 'success' ? 'default' : row.status_front === 'failure' ? 'destructive' : 'secondary'}
           className={
-            row.status_front === 'completed'
+            row.status_front === 'success'
               ? 'bg-green-500 hover:bg-green-600 text-white'
-              : row.status_front === 'failed'
+              : row.status_front === 'failure'
               ? 'bg-red-500 hover:bg-red-600 text-white'
               : 'bg-gray-300 text-gray-700'
           }
         >
-          {row.status_front || 'Pending'}
+          {row.status_front || 'pending'}
         </Badge>
       ),
     },
@@ -117,19 +165,20 @@ export default function ImageJobs() {
       label: '📦 Diff Status',
       render: (row) => (
         <Badge
-          variant={row.status_diff === 'completed' ? 'default' : row.status_diff === 'failed' ? 'destructive' : 'secondary'}
+          variant={row.status_diff === 'success' ? 'default' : row.status_diff === 'failure' ? 'destructive' : 'secondary'}
           className={
-            row.status_diff === 'completed'
+            row.status_diff === 'success'
               ? 'bg-green-500 hover:bg-green-600 text-white'
-              : row.status_diff === 'failed'
+              : row.status_diff === 'failure'
               ? 'bg-red-500 hover:bg-red-600 text-white'
               : 'bg-gray-300 text-gray-700'
           }
         >
-          {row.status_diff || 'Pending'}
+          {row.status_diff || 'pending'}
         </Badge>
       ),
     },
+    { key: 'error_code', label: '⚠️ Error Code', sortable: true },
     {
       key: 'ready_for_publish',
       label: '🚀 Ready',
@@ -195,11 +244,12 @@ export default function ImageJobs() {
           <div className="rounded-xl overflow-hidden border border-purple-100 shadow-sm bg-white/70 backdrop-blur-sm">
             <DataTable
               columns={columns}
-              data={rows}
+              data={sortedRows}
               currentPage={filters.page}
               totalPages={Math.ceil((data?.meta?.total || 0) / filters.page_size)}
               onPageChange={(page) => setFilters({ ...filters, page })}
               onExport={handleExport}
+              onSort={(key, direction) => { setSortKey(key); setSortDir(direction); }}
               searchable={false}
               rowClassName="hover:bg-purple-50/80 transition-colors"
             />

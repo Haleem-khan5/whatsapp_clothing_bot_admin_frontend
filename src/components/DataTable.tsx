@@ -13,6 +13,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ChevronLeft, ChevronRight, Download, Settings2, ArrowUpDown } from 'lucide-react';
@@ -125,15 +126,34 @@ export function DataTable<T extends { id?: string | number }>({
                 .map((column) => (
                   <TableHead key={column.key}>
                     {column.sortable ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSort(column.key)}
-                        className="-ml-3"
-                      >
-                        {column.label}
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <span>{column.label}</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="-ml-1 px-1">
+                              <ArrowUpDown className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="bg-popover">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSortConfig({ key: column.key, direction: 'asc' });
+                                onSort?.(column.key, 'asc');
+                              }}
+                            >
+                              Sort A→Z / Low→High
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSortConfig({ key: column.key, direction: 'desc' });
+                                onSort?.(column.key, 'desc');
+                              }}
+                            >
+                              Sort Z→A / High→Low
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     ) : (
                       column.label
                     )}

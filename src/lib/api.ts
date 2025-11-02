@@ -10,12 +10,13 @@ const rawEnvBase: string | undefined =
   ((typeof window !== 'undefined' && (window as any).__API_BASE__) as string | undefined) ||
   undefined;
 // Sanitize and normalize base URL:
-// - strip leading/trailing whitespace
-// - remove any accidental leading '@'
-// - remove trailing slashes
-// - if empty/undefined, fallback to '/api'
-let envBase = "https://clothing-bot-uw4d.onrender.com";
+// // - use VITE_SERVER_URL when provided, else default to '/api' (Vite dev proxy)
+let envBase = (rawEnvBase || '/api') as string;
+envBase = "https://clothing-bot-uw4d.onrender.com";
+
+// envBase = "http://localhost:8000";
 if (envBase.startsWith('@')) envBase = envBase.slice(1);
+envBase = String(envBase).trim();
 const sanitized = (envBase || '/api').replace(/\/+$/, '');
 const isAbsolute = /^https?:\/\//i.test(sanitized);
 

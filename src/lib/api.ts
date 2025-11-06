@@ -12,6 +12,7 @@ const rawEnvBase: string | undefined =
 // Sanitize and normalize base URL:
 // // - use VITE_SERVER_URL when provided, else default to '/api' (Vite dev proxy)
 let envBase = (rawEnvBase || '/api') as string;
+
 envBase = "https://clothing-bot-uw4d.onrender.com";
 
 // envBase = "http://localhost:8000";

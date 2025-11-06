@@ -5,12 +5,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Trash } from 'lucide-react';
 import { PhoneNumberDialog } from '@/components/PhoneNumberDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStores } from '@/hooks/useStores';
-import { useNumbers } from '@/hooks/useNumbers';
+import { useNumbers, useDeleteNumber } from '@/hooks/useNumbers';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { toast } from '@/hooks/use-toast';
 
 export default function Phones() {
   const { isAdmin } = useAuth();
@@ -23,6 +35,7 @@ export default function Phones() {
   const { data: storesResp } = useStores();
   const stores = (storesResp?.data || []).map((s: any) => ({ id: s.store_id, name: s.store_name }));
   const { data: numbersResp, refetch } = useNumbers(selectedStoreId, storeNameQuery || undefined, q || undefined);
+  const deleteNumber = useDeleteNumber();
 
   const rows = (numbersResp?.data || []).map((n: any) => ({
     id: n.number_id,
@@ -50,6 +63,45 @@ export default function Phones() {
       ),
     },
     { key: 'last_seen', label: '🕒 Last Seen' },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (row) => (
+        isAdmin ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" className="bg-red-600 hover:bg-red-700">
+                <Trash className="h-4 w-4 mr-1" /> Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this number?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete this number and all related jobs and messages. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    try {
+                      await deleteNumber.mutateAsync(row.id);
+                      toast({ title: 'Number deleted', description: `${row.phone} was removed.` });
+                      refetch();
+                    } catch (e: any) {
+                      toast({ title: 'Failed to delete', description: e?.message || 'Please try again.' });
+                    }
+                  }}
+                >
+                  Confirm Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null
+      ),
+    },
   ];
 
   return (

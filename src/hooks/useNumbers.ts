@@ -40,3 +40,17 @@ export function useNumbers(storeId?: string, storeNameQuery?: string, q?: string
 }
 
 
+export function useDeleteNumber() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (numberId: string) => {
+      const response = await api.delete(`/numbers/${numberId}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['numbers'] });
+    },
+  });
+}
+
+

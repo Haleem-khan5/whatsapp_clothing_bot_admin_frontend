@@ -9,6 +9,7 @@ export interface ImageJob {
   original_file_url?: string;
   front_pose_url?: string;
   different_pose_url?: string;
+  third_pose_url?: string;
   time_received?: string;
   time_finished?: string;
   processing_time_sec?: number;

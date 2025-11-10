@@ -41,6 +41,8 @@ const catalogItems = [
   { title: 'Credit Catalog', url: '/catalogs/credit', icon: BookOpen },
   { title: 'Payment For', url: '/catalogs/payment-for', icon: BookOpen },
   { title: 'Payment Method', url: '/catalogs/payment-method', icon: BookOpen },
+  { title: 'Prompts', url: '/catalogs/prompts', icon: BookOpen },
+  { title: 'Packages', url: '/catalogs/packages', icon: BookOpen },
 ];
 
 const opsItems = [{ title: 'Phones', url: '/phones', icon: Phone }];

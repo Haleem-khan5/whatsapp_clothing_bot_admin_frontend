@@ -12,8 +12,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useCreateStore, useUpdateStore, Store } from '@/hooks/useStores';
+import { Textarea } from '@/components/ui/textarea';
+import { useCreateStore, useUpdateStore, Store, useStore } from '@/hooks/useStores';
+import { usePrompts } from '@/hooks/usePrompts';
+import { usePackages } from '@/hooks/usePackages';
 import { useToast } from '@/hooks/use-toast';
+import { api } from '@/lib/api';
 
 interface StoreDialogProps {
   open: boolean;
@@ -26,55 +30,102 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
     store || {
       store_name: '',
       store_kind: 'Market',
+      prompt_1: '',
       max_images_per_hour: 100,
       max_images_per_msg: 10,
       is_paused: false,
       credit_remaining_egp: 0,
     }
   );
+  const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const createStore = useCreateStore();
   const updateStore = useUpdateStore();
   const { toast } = useToast();
+  const { data: promptsData } = usePrompts('global');
+  const { data: packagesData } = usePackages();
+  const storeDetails = useStore(store?.id || '');
 
   useEffect(() => {
     if (!open) return;
-    if (store) {
+    // Prefer fresh store details when editing
+    const raw: any = (storeDetails?.data as any)?.data || store;
+    const s = raw
+      ? {
+          ...raw,
+          id: raw.id || raw.store_id, // normalize API payload
+        }
+      : raw;
+    if (s && s.id) {
       setFormData({
-        id: store.id,
-        store_name: store.store_name,
-        store_kind: store.store_kind,
-        address: store.address,
-        max_images_per_hour: store.max_images_per_hour,
-        max_images_per_msg: store.max_images_per_msg,
-        is_paused: !!store.is_paused,
-        credit_remaining_egp: store.credit_remaining_egp ?? 0,
+        id: s.id,
+        store_name: s.store_name,
+        store_kind: s.store_kind,
+        address: s.address,
+        prompt_1: s.prompt_1,
+        prompt2_id: s.prompt2_id,
+        prompt3_id: s.prompt3_id,
+        package_id: s.package_id,
+        background_image_url: s.background_image_url,
+        max_images_per_hour: s.max_images_per_hour,
+        max_images_per_msg: s.max_images_per_msg,
+        is_paused: !!s.is_paused,
+        credit_remaining_egp: s.credit_remaining_egp ?? 0,
       });
+      setBackgroundFile(null);
     } else {
       setFormData({
         store_name: '',
         store_kind: 'Market',
         address: '',
+        prompt_1: '',
+        prompt2_id: undefined,
+        prompt3_id: undefined,
+        package_id: undefined,
+        background_image_url: '',
         max_images_per_hour: 100,
         max_images_per_msg: 10,
         is_paused: false,
         credit_remaining_egp: 0,
       });
+      setBackgroundFile(null);
     }
-  }, [open, store?.id, store?.store_name, store?.store_kind, store?.address, store?.max_images_per_hour, store?.max_images_per_msg, store?.is_paused, store?.credit_remaining_egp]);
+  }, [open, store?.id, storeDetails?.data, store?.store_name, store?.store_kind, store?.address, store?.prompt_1, store?.prompt2_id, store?.prompt3_id, store?.package_id, store?.background_image_url, store?.max_images_per_hour, store?.max_images_per_msg, store?.is_paused, store?.credit_remaining_egp]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
+      let backgroundUrl = formData.background_image_url || '';
+      if (backgroundFile) {
+        setIsUploading(true);
+        const signRes = await api.post('/uploads/sign', {
+          filename: `${Date.now()}_${backgroundFile.name}`,
+          content_type: backgroundFile.type || 'application/octet-stream',
+          folder: `stores/${(formData.id as string) || 'general'}`,
+        });
+        const { put_url, public_url } = (signRes.data as any).data || signRes.data;
+        await fetch(put_url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': backgroundFile.type || 'application/octet-stream',
+          },
+          body: backgroundFile,
+        });
+        backgroundUrl = public_url;
+        setFormData((prev) => ({ ...prev, background_image_url: backgroundUrl }));
+        setIsUploading(false);
+      }
+
       if (store?.id) {
-        await updateStore.mutateAsync({ id: store.id, data: formData });
+        await updateStore.mutateAsync({ id: store.id, data: { ...formData, background_image_url: backgroundUrl } });
         toast({
           title: 'Store updated',
           description: 'The store has been updated successfully.',
         });
       } else {
-        await createStore.mutateAsync(formData);
+        await createStore.mutateAsync({ ...formData, background_image_url: backgroundUrl });
         toast({
           title: 'Store created',
           description: 'The store has been created successfully.',
@@ -82,6 +133,7 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
       }
       onOpenChange(false);
     } catch (error: any) {
+      setIsUploading(false);
       toast({
         title: 'Error',
         description: error.response?.data?.message || 'Failed to save store',
@@ -141,6 +193,92 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
               value={formData.address || ''}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="prompt_1">Prompt 1 (used for first picture)</Label>
+            <Textarea
+              id="prompt_1"
+              placeholder="Enter the store's first-image generation prompt"
+              value={formData.prompt_1 || ''}
+              onChange={(e) => setFormData({ ...formData, prompt_1: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="prompt2_id">Prompt 2 (pick a predefined prompt)</Label>
+              <Select
+                value={formData.prompt2_id || ''}
+                onValueChange={(value: any) => setFormData({ ...formData, prompt2_id: value || undefined })}
+              >
+                <SelectTrigger id="prompt2_id">
+                  <SelectValue placeholder="Select Prompt 2" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(promptsData?.data || []).map((p: any) => (
+                    <SelectItem key={p.prompt_id} value={p.prompt_id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="prompt3_id">Prompt 3 (pick a predefined prompt)</Label>
+              <Select
+                value={formData.prompt3_id || ''}
+                onValueChange={(value: any) => setFormData({ ...formData, prompt3_id: value || undefined })}
+              >
+                <SelectTrigger id="prompt3_id">
+                  <SelectValue placeholder="Select Prompt 3" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(promptsData?.data || []).map((p: any) => (
+                    <SelectItem key={p.prompt_id} value={p.prompt_id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="package_id">Default Package</Label>
+            <Select
+              value={formData.package_id || ''}
+              onValueChange={(value: any) => setFormData({ ...formData, package_id: value || undefined })}
+            >
+              <SelectTrigger id="package_id">
+                <SelectValue placeholder="Select package" />
+              </SelectTrigger>
+              <SelectContent>
+                {(packagesData?.data || []).map((pkg: any) => (
+                  <SelectItem key={pkg.package_id} value={pkg.package_id}>
+                    {pkg.name} — {pkg.price_per_dress} {pkg.currency}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="background_image">Background Image</Label>
+            <Input
+              id="background_image"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setBackgroundFile(e.target.files?.[0] || null)}
+            />
+            {formData.background_image_url && !backgroundFile && (
+              <div className="flex items-center gap-3">
+                <img
+                  src={formData.background_image_url}
+                  alt="Current background"
+                  className="w-16 h-10 object-cover rounded border"
+                />
+                <div className="text-xs text-muted-foreground truncate">
+                  Current: {formData.background_image_url}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -217,7 +355,7 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createStore.isPending || updateStore.isPending}>
+            <Button type="submit" disabled={createStore.isPending || updateStore.isPending || isUploading}>
               {store ? 'Update' : 'Create'} Store
             </Button>
           </DialogFooter>

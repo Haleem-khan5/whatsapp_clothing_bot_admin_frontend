@@ -16,6 +16,8 @@ import Downloads from "./pages/Downloads";
 import CreditCatalog from "./pages/CreditCatalog";
 import PaymentFor from "./pages/PaymentFor";
 import PaymentMethod from "./pages/PaymentMethod";
+import CatalogPrompts from "./pages/CatalogPrompts";
+import CatalogPackages from "./pages/CatalogPackages";
 import Phones from "./pages/Phones";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
@@ -45,6 +47,8 @@ const App = () => (
               <Route path="/catalogs/credit" element={<CreditCatalog />} />
               <Route path="/catalogs/payment-for" element={<PaymentFor />} />
               <Route path="/catalogs/payment-method" element={<PaymentMethod />} />
+              <Route path="/catalogs/prompts" element={<CatalogPrompts />} />
+              <Route path="/catalogs/packages" element={<CatalogPackages />} />
               <Route path="/phones" element={<Phones />} />
               <Route path="/users" element={<Users />} />
               <Route path="/settings" element={<Settings />} />

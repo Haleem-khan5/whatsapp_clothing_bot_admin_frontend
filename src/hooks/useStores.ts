@@ -5,6 +5,11 @@ export interface Store {
   id: string;
   store_name: string;
   address?: string;
+  prompt_1?: string;
+  prompt2_id?: string;
+  prompt3_id?: string;
+  package_id?: string;
+  background_image_url?: string;
   store_kind: 'Market' | 'Mall' | 'Personal';
   registration_date?: string;
   max_images_per_hour: number;

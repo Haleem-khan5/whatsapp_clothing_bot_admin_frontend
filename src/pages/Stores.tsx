@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Plus, MoreHorizontal, Building2, Search } from 'lucide-react';
 import { useStores, useUpdateStore, useDeleteStore } from '@/hooks/useStores';
 import { useToast } from '@/hooks/use-toast';
+import { usePackages } from '@/hooks/usePackages';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,6 +53,41 @@ export default function Stores() {
   const updateStore = useUpdateStore();
   const deleteStore = useDeleteStore();
   const { toast } = useToast();
+  const { data: packagesResp } = usePackages();
+  const packageList: any[] = (packagesResp?.data || []);
+  const packageIdToName: Record<string, string> = Object.fromEntries(
+    packageList.map((p: any) => [p.package_id, p.name])
+  );
+
+  function formatDateShort(d: string | Date | null | undefined): string {
+    if (!d) return '-';
+    const date = typeof d === 'string' ? new Date(d) : d;
+    if (!date || isNaN(date.getTime())) return '-';
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    const day = date.getDate();
+    const yy = String(date.getFullYear()).slice(-2);
+    return `${month}-${day}-${yy}`;
+  }
+
+  function formatDateTimeShort(d: string | Date | null | undefined, tz: string = 'Africa/Cairo'): string {
+    if (!d) return '-';
+    const date = typeof d === 'string' ? new Date(d) : d;
+    if (!date || isNaN(date.getTime())) return '-';
+    const datePart = formatDateShort(date);
+    const timePart = date.toLocaleString('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    return `${datePart}, ${timePart}`;
+    }
+
+  function formatInt(n: any): string {
+    const num = Number(n || 0);
+    if (!isFinite(num)) return '0';
+    return String(Math.trunc(num));
+  }
 
   // Map and filter data
   const stores = (data?.data || []).map((s: any) => ({
@@ -64,13 +100,15 @@ export default function Stores() {
     max_images_per_msg: s.max_images_per_msg,
     is_paused: s.is_paused,
     credit_remaining_egp: s.credit_remaining_egp,
-    remaining_quota_images: s.remaining_quota_images,
+    remaining_quota_images: s.remaining_quota_images, // kept for compatibility
     total_top_ups_egp: s.total_top_ups_egp,
     image_jobs_count: s.image_jobs_count,
     video_jobs_count: s.video_jobs_count,
     last_active_at: s.last_active_at,
     whatsapp_numbers_count: s.whatsapp_numbers_count,
     refunded_jobs_count: s.refunded_jobs_count,
+    per_image_credit: s.per_image_credit,
+    package_id: s.package_id,
   }));
 
   let filteredStores = stores.filter((store) =>
@@ -136,59 +174,60 @@ export default function Stores() {
   };
 
   const columns: Column<any>[] = [
-    { key: 'store_name', label: '🏪 Store Name', sortable: true },
-    { key: 'store_kind', label: '🏷️ Type', sortable: true },
-    { key: 'address', label: '📍 Address' },
+    { key: 'store_name', label: 'Store Name', sortable: true },
     {
       key: 'registration_date',
-      label: '🗓️ Registered On',
+      label: 'Registered on',
       sortable: true,
-      render: (row) => {
-        const d = row.registration_date ? new Date(row.registration_date) : null;
-        return d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '-';
-      },
+      render: (row) => formatDateShort(row.registration_date),
     },
-    { key: 'max_images_per_hour', label: '⚡ Max/Hr', sortable: true },
-    { key: 'max_images_per_msg', label: '🖼️ Max/Msg', sortable: true },
-    { key: 'credit_remaining_egp', label: '💳 Credit Remaining (EGP)', sortable: true },
-    { key: 'remaining_quota_images', label: '🖼️ Remaining Quota (images)', sortable: true },
-    { key: 'total_top_ups_egp', label: '💰 Top Ups (EGP)', sortable: true },
-    { key: 'image_jobs_count', label: '🖼️ Image Jobs', sortable: true },
-    { key: 'video_jobs_count', label: '🎞️ Video Jobs', sortable: true },
     {
       key: 'last_active_at',
-      label: '🕒 Last Active (EG)',
+      label: 'Last active',
       sortable: true,
-      render: (row) =>
-        row.last_active_at
-          ? new Date(row.last_active_at).toLocaleString('en-EG', {
-              timeZone: 'Africa/Cairo',
-              year: 'numeric',
-              month: 'short',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : '-',
+      render: (row) => formatDateTimeShort(row.last_active_at),
     },
-    { key: 'whatsapp_numbers_count', label: '# WhatsApp Numbers', sortable: true },
-    { key: 'refunded_jobs_count', label: '↩️ Refunded Jobs', sortable: true },
     {
-      key: 'is_paused',
-      label: 'Status',
-      render: (row) => (
-        <Badge
-          variant={row.is_paused ? 'secondary' : 'default'}
-          className={
-            row.is_paused
-              ? 'bg-gray-300 text-gray-700'
-              : 'bg-green-500 hover:bg-green-600 text-white'
-          }
-        >
-          {row.is_paused ? 'Paused' : 'Active'}
-        </Badge>
-      ),
+      key: 'package',
+      label: 'Package',
+      render: (row) => {
+        if (row.package_id) {
+          return packageIdToName[row.package_id] || '—';
+        }
+        return 'Trial';
+      },
     },
+    {
+      key: 'total_top_ups_egp',
+      label: 'Top Ups',
+      sortable: true,
+      render: (row) => formatInt(row.total_top_ups_egp),
+    },
+    { key: 'image_jobs_count', label: 'Image Jobs', sortable: true },
+    {
+      key: 'credit_remaining_egp',
+      label: 'Credit Remaining (EGP)',
+      sortable: true,
+      render: (row) => formatInt(row.credit_remaining_egp),
+    },
+    {
+      key: 'image_jobs_credit',
+      label: 'Image Jobs Credit',
+      sortable: true,
+      render: (row) => {
+        const credit = Number(row.credit_remaining_egp || 0);
+        const per = Number(row.per_image_credit || 0);
+        if (!per || per <= 0) return '0';
+        return String(Math.floor(credit / per));
+      },
+    },
+    { key: 'video_jobs_count', label: 'Video Jobs', sortable: true },
+    { key: 'refunded_jobs_count', label: 'Refunded Jobs', sortable: true },
+    { key: 'whatsapp_numbers_count', label: 'Whatsapp Numbers', sortable: true },
+    { key: 'max_images_per_hour', label: 'Max/Hr', sortable: true },
+    { key: 'max_images_per_msg', label: 'Max/Msg', sortable: true },
+    { key: 'store_kind', label: 'Type', sortable: true },
+    { key: 'address', label: 'Address' },
     {
       key: 'actions',
       label: '',
@@ -371,3 +410,4 @@ export default function Stores() {
     </div>
   );
 }
+

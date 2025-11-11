@@ -43,8 +43,32 @@ export default function Phones() {
     assigned_store: n.store_name_cache,
     total_jobs: n.total_jobs,
     is_primary: n.is_primary,
-    last_seen: n.updated_at || n.created_at,
+    last_active_at: n.last_active_at || n.updated_at || n.created_at,
   }));
+
+  function formatDateShort(d: string | Date | null | undefined): string {
+    if (!d) return '-';
+    const date = typeof d === 'string' ? new Date(d) : d;
+    if (!date || isNaN(date.getTime())) return '-';
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    const day = date.getDate();
+    const yy = String(date.getFullYear()).slice(-2);
+    return `${month}-${day}-${yy}`;
+  }
+
+  function formatDateTimeShort(d: string | Date | null | undefined, tz: string = 'Africa/Cairo'): string {
+    if (!d) return '-';
+    const date = typeof d === 'string' ? new Date(d) : d;
+    if (!date || isNaN(date.getTime())) return '-';
+    const datePart = formatDateShort(date);
+    const timePart = date.toLocaleString('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    return `${datePart}, ${timePart}`;
+  }
 
   const columns: Column<any>[] = [
     { key: 'phone', label: '📞 Phone', sortable: true },
@@ -62,7 +86,12 @@ export default function Phones() {
         </Badge>
       ),
     },
-    { key: 'last_seen', label: '🕒 Last Seen' },
+    {
+      key: 'last_active_at',
+      label: '🕒 Last active',
+      sortable: true,
+      render: (row) => formatDateTimeShort(row.last_active_at),
+    },
     {
       key: 'actions',
       label: 'Actions',

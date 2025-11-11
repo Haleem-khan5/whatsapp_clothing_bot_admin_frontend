@@ -101,7 +101,7 @@ export default function ImageJobs() {
     },
     {
       key: 'front_pose_url',
-      label: '💠 Front Pose',
+      label: '💠 1st Pose (Front)',
       render: (row) =>
         row.front_pose_url ? (
           <Button
@@ -120,7 +120,7 @@ export default function ImageJobs() {
     },
     {
       key: 'diff_pose_url',
-      label: '🔁 Different Pose',
+      label: '🔁 2nd Pose (Different)',
       render: (row) =>
         row.diff_pose_url ? (
           <Button
@@ -130,6 +130,25 @@ export default function ImageJobs() {
             asChild
           >
             <a href={row.diff_pose_url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </Button>
+        ) : (
+          '-'
+        ),
+    },
+    {
+      key: 'third_pose_url',
+      label: '3️⃣ 3rd Pose',
+      render: (row) =>
+        row.third_pose_url ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-purple-600 hover:bg-purple-100 hover:text-purple-700 transition-all"
+            asChild
+          >
+            <a href={row.third_pose_url} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="h-4 w-4" />
             </a>
           </Button>
@@ -162,7 +181,7 @@ export default function ImageJobs() {
     },
     {
       key: 'status_diff',
-      label: '📦 Diff Status',
+      label: '📦 2nd Status',
       render: (row) => (
         <Badge
           variant={row.status_diff === 'success' ? 'default' : row.status_diff === 'failure' ? 'destructive' : 'secondary'}
@@ -175,6 +194,24 @@ export default function ImageJobs() {
           }
         >
           {row.status_diff || 'pending'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'status_third',
+      label: '📦 3rd Status',
+      render: (row) => (
+        <Badge
+          variant={row.status_third === 'success' ? 'default' : row.status_third === 'failure' ? 'destructive' : 'secondary'}
+          className={
+            row.status_third === 'success'
+              ? 'bg-green-500 hover:bg-green-600 text-white'
+              : row.status_third === 'failure'
+              ? 'bg-red-500 hover:bg-red-600 text-white'
+              : 'bg-gray-300 text-gray-700'
+          }
+        >
+          {row.status_third || 'pending'}
         </Badge>
       ),
     },

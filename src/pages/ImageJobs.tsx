@@ -13,8 +13,11 @@ export default function ImageJobs() {
     page: 1,
     page_size: 20,
   });
+  const [storeId, setStoreId] = useState<string | undefined>(undefined);
+  const [from, setFrom] = useState<string | undefined>(undefined);
+  const [to, setTo] = useState<string | undefined>(undefined);
 
-  const { data, isLoading } = useImageJobs(filters);
+  const { data, isLoading } = useImageJobs({ ...filters, store_id: storeId, from, to });
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const { data: storesResp } = useStores();
@@ -67,18 +70,21 @@ export default function ImageJobs() {
       key: 'timestamp',
       label: '⏱ Timestamp (EG)',
       sortable: true,
-      render: (row) =>
-        row.timestamp
-          ? new Date(row.timestamp).toLocaleString('en-EG', {
-              timeZone: 'Africa/Cairo',
-              year: 'numeric',
-              month: 'short',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-            })
-          : '-',
+      render: (row) => {
+        if (!row.timestamp) return '-';
+        const d = new Date(row.timestamp);
+        if (isNaN(d.getTime())) return '-';
+        const month = d.toLocaleString('en-US', { month: 'short', timeZone: 'Africa/Cairo' });
+        const day = d.toLocaleString('en-US', { day: 'numeric', timeZone: 'Africa/Cairo' }); // no zero pad
+        const year2 = d.toLocaleString('en-US', { year: '2-digit', timeZone: 'Africa/Cairo' });
+        const time = d.toLocaleString('en-US', {
+          timeZone: 'Africa/Cairo',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+        return `${month}-${day}-${year2}, ${time}`;
+      },
     },
     {
       key: 'original_file_url',
@@ -156,11 +162,13 @@ export default function ImageJobs() {
           '-'
         ),
     },
-    { key: 'processing_time_sec', label: '⚙️ Processing Time (s)', sortable: true },
-    { key: 'tokens_used', label: '🔢 Tokens Used', sortable: true },
-    { key: 'cost_per_token_usd', label: '💵 Cost/Token (USD)', sortable: true },
-    { key: 'usd_to_egp', label: '💱 USD/EGP', sortable: true },
-    { key: 'my_cost_egp', label: '💰 My Cost (EGP)', sortable: true },
+    {
+      key: 'processing_time_sec',
+      label: '⚙️ Processing Time (s)',
+      sortable: true,
+      render: (row) => (row.processing_time_sec != null ? Math.round(Number(row.processing_time_sec)) : '-'),
+    },
+    // Move statuses and error code immediately after processing time
     {
       key: 'status_front',
       label: '📦 Front Status',
@@ -216,6 +224,20 @@ export default function ImageJobs() {
       ),
     },
     { key: 'error_code', label: '⚠️ Error Code', sortable: true },
+    // Keep the rest after
+    { key: 'tokens_used', label: '🔢 Tokens Used', sortable: true },
+    { key: 'cost_per_token_usd', label: '💵 Cost/Token (USD)', sortable: true },
+    { key: 'usd_to_egp', label: '💱 USD/EGP', sortable: true },
+    {
+      key: 'my_cost_egp',
+      label: '💰 Credits (EGP)',
+      sortable: true,
+      render: (row) => {
+        const n = Number(row.my_cost_egp || 0);
+        if (!isFinite(n)) return '0';
+        return String(Math.trunc(n));
+      },
+    },
     {
       key: 'ready_for_publish',
       label: '🚀 Ready',
@@ -265,6 +287,48 @@ export default function ImageJobs() {
           </Button>
         </div>
       </div>
+
+      {/* FILTERS */}
+      <Card className="bg-gradient-to-br from-white via-purple-50 to-pink-50 border-none shadow-lg rounded-2xl">
+        <CardHeader>
+          <CardTitle className="text-purple-700 text-lg font-semibold">Filters</CardTitle>
+          <CardDescription className="text-purple-400 font-medium">
+            Filter by store and date range.
+          </CardDescription>
+        </CardHeader>
+        <Separator className="bg-gradient-to-r from-purple-400 to-pink-400 h-[2px] my-1 rounded" />
+        <CardContent>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1">
+              <label className="text-sm text-gray-700 font-medium">Store</label>
+              <Select value={storeId ?? '__ALL__'} onValueChange={(v) => setStoreId(v === '__ALL__' ? undefined : v)}>
+                <SelectTrigger className="w-[220px] bg-white shadow-sm">
+                  <SelectValue placeholder="All stores" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__ALL__">All stores</SelectItem>
+                  {(storesResp?.data || []).map((s: any) => (
+                    <SelectItem key={s.store_id} value={s.store_id}>{s.store_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-gray-700 font-medium">From</label>
+              <input type="date" className="h-9 rounded-md border bg-background px-3 text-sm"
+                value={from || ''} onChange={(e) => setFrom(e.target.value || undefined)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-gray-700 font-medium">To</label>
+              <input type="date" className="h-9 rounded-md border bg-background px-3 text-sm"
+                value={to || ''} onChange={(e) => setTo(e.target.value || undefined)} />
+            </div>
+            <Button variant="outline" onClick={() => { /* rely on reactive query */ }} className="border-purple-400 text-purple-700 hover:bg-purple-100 hover:text-purple-800 transition-all">
+              Apply Filters
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* TABLE CARD */}
       <Card className="shadow-xl border-none bg-gradient-to-br from-white via-purple-50 to-pink-50 rounded-2xl">

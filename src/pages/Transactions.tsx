@@ -100,12 +100,23 @@ export default function Transactions() {
 
   const totalVisible = filteredRows.reduce((acc: number, r: any) => acc + Number(r.amount_egp || 0), 0);
 
+  function formatInt(n: any): string {
+    const num = Number(n || 0);
+    if (!isFinite(num)) return '0';
+    return String(Math.trunc(num));
+  }
+
   const columns: Column<any>[] = [
     { key: 'txn_date', label: '📅 Date', sortable: true },
     { key: 'id', label: '🧾 Txn ID', sortable: true },
     { key: 'store_name', label: '🏪 Store', sortable: true },
     { key: 'payment_for', label: '💳 Payment For' },
-    { key: 'amount_egp', label: '💰 Amount (EGP)', sortable: true },
+    {
+      key: 'amount_egp',
+      label: '💰 Amount (EGP)',
+      sortable: true,
+      render: (row) => formatInt(row.amount_egp),
+    },
     { key: 'payment_method', label: '💼 Method' },
     {
       key: 'payment_reference_url',
@@ -254,7 +265,7 @@ export default function Transactions() {
         <CardContent>
           <div className="rounded-xl overflow-hidden border border-purple-100 shadow-sm bg-white/70 backdrop-blur-sm">
             <div className="flex items-center justify-between px-4 py-2 text-sm text-purple-700">
-              <div><span className="font-semibold">Total (visible):</span> {totalVisible.toFixed(2)} EGP</div>
+              <div><span className="font-semibold">Total (visible):</span> {Math.trunc(totalVisible)} EGP</div>
               <div className="text-purple-500">Rows: {filteredRows.length}</div>
             </div>
             <DataTable

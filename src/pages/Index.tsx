@@ -36,13 +36,7 @@ const Index = () => {
     { title: 'Video Costs (EGP)', value: `EGP ${(r.video_jobs_cost_egp ?? 0)?.toLocaleString?.() ?? (r.video_jobs_cost_egp ?? 0)}`, icon: DollarSign, description: 'Costs in range' },
   ];
 
-  const quickActions = [
-    { title: 'WhatsApp Numbers', icon: Phone, to: '/phones', description: 'Manage phone numbers' },
-    { title: 'Transactions', icon: Receipt, to: '/transactions', description: 'View payment history' },
-    { title: 'Refunds', icon: RotateCcw, to: '/refunds', description: 'Process refunds' },
-    { title: 'Video Jobs', icon: Video, to: '/video-jobs', description: 'Manage video jobs' },
-    { title: 'Downloads', icon: Download, to: '/downloads', description: 'Download reports' },
-  ];
+  const quickActions: any[] = [];
 
   return (
     <div className="space-y-8">
@@ -54,14 +48,7 @@ const Index = () => {
         {/* Filters moved below into Overview */}
       </div>
 
-      <div>
-        <h2 className="text-2xl font-bold mb-4">Quick Actions</h2>
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 items-stretch auto-rows-fr">
-          {quickActions.map((action, index) => (
-            <QuickActionCard key={index} {...action} />
-          ))}
-        </div>
-      </div>
+      {/* Quick Actions removed per request */}
 
       <div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">

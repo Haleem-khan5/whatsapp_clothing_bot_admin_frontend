@@ -31,6 +31,7 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
       store_name: '',
       store_kind: 'Market',
       prompt_1: '',
+      prompt1_id: undefined as any,
       max_images_per_hour: 100,
       max_images_per_msg: 10,
       is_paused: false,
@@ -43,7 +44,8 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
   const createStore = useCreateStore();
   const updateStore = useUpdateStore();
   const { toast } = useToast();
-  const { data: promptsData } = usePrompts('global');
+  const [promptsSearch, setPromptsSearch] = useState<string>('');
+  const { data: promptsData } = usePrompts('global', promptsSearch);
   const { data: packagesData } = usePackages();
   const storeDetails = useStore(store?.id || '');
 
@@ -64,6 +66,7 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
         store_kind: s.store_kind,
         address: s.address,
         prompt_1: s.prompt_1,
+        prompt1_id: (s as any).prompt1_id,
         prompt2_id: s.prompt2_id,
         prompt3_id: s.prompt3_id,
         package_id: s.package_id,
@@ -196,13 +199,31 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="prompt_1">Prompt 1 (used for first picture)</Label>
-            <Textarea
-              id="prompt_1"
-              placeholder="Enter the store's first-image generation prompt"
-              value={formData.prompt_1 || ''}
-              onChange={(e) => setFormData({ ...formData, prompt_1: e.target.value })}
-            />
+            <Label htmlFor="prompt1_id">Prompt 1 (select predefined)</Label>
+            <Select
+              value={formData.prompt1_id || ''}
+              onValueChange={(value: any) => {
+                const p = (promptsData?.data || []).find((pp: any) => pp.prompt_id === value);
+                setFormData({ ...formData, prompt1_id: value || undefined, prompt_1: p ? p.prompt_text : '' });
+              }}
+            >
+              <SelectTrigger id="prompt1_id">
+                <SelectValue placeholder="Select Prompt 1" />
+              </SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-1">
+                  <Input
+                    placeholder="Search prompts…"
+                    value={promptsSearch}
+                    onChange={(e) => setPromptsSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                {(promptsData?.data || []).map((p: any) => (
+                  <SelectItem key={p.prompt_id} value={p.prompt_id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

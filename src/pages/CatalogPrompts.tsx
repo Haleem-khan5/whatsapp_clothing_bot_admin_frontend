@@ -31,11 +31,13 @@ export default function CatalogPrompts() {
   }, [open, editing]);
 
   const columns: Column<Prompt>[] = [
-    { key: 'name', header: 'Name', render: (row) => row.name },
-    { key: 'prompt_text', header: 'Prompt Text', render: (row) => <div className="truncate max-w-[600px] whitespace-pre-line">{row.prompt_text}</div> },
+    { key: 'name', header: 'Name', label: 'Name', sortable: true, render: (row) => row.name },
+    { key: 'prompt_text', header: 'Prompt Text', label: 'Prompt Text', render: (row) => <div className="truncate max-w-[600px] whitespace-pre-line">{row.prompt_text}</div> },
+    { key: 'store_count', header: '# of stores', label: '# of stores', sortable: true, render: (row: any) => row.store_count ?? 0 },
     {
       key: 'actions',
       header: '',
+      label: '',
       width: 60,
       render: (row) => (
         <DropdownMenu>

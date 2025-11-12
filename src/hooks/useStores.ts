@@ -66,6 +66,7 @@ export function useCreateStore() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stores'] });
+      queryClient.invalidateQueries({ queryKey: ['prompts'] });
     },
   });
 }
@@ -80,6 +81,7 @@ export function useUpdateStore() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stores'] });
+      queryClient.invalidateQueries({ queryKey: ['prompts'] });
     },
   });
 }
@@ -94,6 +96,7 @@ export function useDeleteStore() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stores'] });
+      queryClient.invalidateQueries({ queryKey: ['prompts'] });
     },
   });
 }

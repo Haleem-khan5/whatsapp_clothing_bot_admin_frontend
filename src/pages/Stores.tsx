@@ -191,9 +191,9 @@ export default function Stores() {
       key: 'package',
       label: 'Package',
       render: (row) => {
-        if (row.package_id) {
-          return packageIdToName[row.package_id] || '—';
-        }
+        const hasTopUps = Number(row.total_top_ups_egp || 0) > 0;
+        if (!hasTopUps) return 'Trial';
+        if (row.package_id) return packageIdToName[row.package_id] || '—';
         return 'Trial';
       },
     },

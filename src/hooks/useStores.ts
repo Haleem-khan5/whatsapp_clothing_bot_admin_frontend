@@ -6,6 +6,7 @@ export interface Store {
   store_name: string;
   address?: string;
   prompt_1?: string;
+  prompt1_id?: string;
   prompt2_id?: string;
   prompt3_id?: string;
   package_id?: string;

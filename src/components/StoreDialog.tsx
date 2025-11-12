@@ -45,6 +45,8 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
   const updateStore = useUpdateStore();
   const { toast } = useToast();
   const [promptsSearch, setPromptsSearch] = useState<string>('');
+  const [promptsSearch2, setPromptsSearch2] = useState<string>('');
+  const [promptsSearch3, setPromptsSearch3] = useState<string>('');
   const { data: promptsData } = usePrompts('global', promptsSearch);
   const { data: packagesData } = usePackages();
   const storeDetails = useStore(store?.id || '');
@@ -207,10 +209,10 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
                 setFormData({ ...formData, prompt1_id: value || undefined, prompt_1: p ? p.prompt_text : '' });
               }}
             >
-              <SelectTrigger id="prompt1_id">
+              <SelectTrigger id="prompt1_id" className="w-full">
                 <SelectValue placeholder="Select Prompt 1" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="w-[min(90vw,40rem)] max-h-[60vh] overflow-y-auto">
                 <div className="px-2 py-1">
                   <Input
                     placeholder="Search prompts…"
@@ -219,7 +221,9 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
                     className="h-8"
                   />
                 </div>
-                {(promptsData?.data || []).map((p: any) => (
+                {((promptsData?.data || []) as any[])
+                  .filter((p: any) => !promptsSearch || String(p.name || '').toLowerCase().includes(promptsSearch.toLowerCase()))
+                  .map((p: any) => (
                   <SelectItem key={p.prompt_id} value={p.prompt_id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -233,11 +237,21 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
                 value={formData.prompt2_id || ''}
                 onValueChange={(value: any) => setFormData({ ...formData, prompt2_id: value || undefined })}
               >
-                <SelectTrigger id="prompt2_id">
+                <SelectTrigger id="prompt2_id" className="w-full">
                   <SelectValue placeholder="Select Prompt 2" />
                 </SelectTrigger>
-                <SelectContent>
-                  {(promptsData?.data || []).map((p: any) => (
+                <SelectContent className="w-[min(90vw,40rem)] max-h-[60vh] overflow-y-auto">
+                  <div className="px-2 py-1">
+                    <Input
+                      placeholder="Search prompts…"
+                      value={promptsSearch2}
+                      onChange={(e) => setPromptsSearch2(e.target.value)}
+                      className="h-8"
+                    />
+                  </div>
+                  {((promptsData?.data || []) as any[])
+                    .filter((p: any) => !promptsSearch2 || String(p.name || '').toLowerCase().includes(promptsSearch2.toLowerCase()))
+                    .map((p: any) => (
                     <SelectItem key={p.prompt_id} value={p.prompt_id}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -249,11 +263,21 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
                 value={formData.prompt3_id || ''}
                 onValueChange={(value: any) => setFormData({ ...formData, prompt3_id: value || undefined })}
               >
-                <SelectTrigger id="prompt3_id">
+                <SelectTrigger id="prompt3_id" className="w-full">
                   <SelectValue placeholder="Select Prompt 3" />
                 </SelectTrigger>
-                <SelectContent>
-                  {(promptsData?.data || []).map((p: any) => (
+                <SelectContent className="w-[min(90vw,40rem)] max-h-[60vh] overflow-y-auto">
+                  <div className="px-2 py-1">
+                    <Input
+                      placeholder="Search prompts…"
+                      value={promptsSearch3}
+                      onChange={(e) => setPromptsSearch3(e.target.value)}
+                      className="h-8"
+                    />
+                  </div>
+                  {((promptsData?.data || []) as any[])
+                    .filter((p: any) => !promptsSearch3 || String(p.name || '').toLowerCase().includes(promptsSearch3.toLowerCase()))
+                    .map((p: any) => (
                     <SelectItem key={p.prompt_id} value={p.prompt_id}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>

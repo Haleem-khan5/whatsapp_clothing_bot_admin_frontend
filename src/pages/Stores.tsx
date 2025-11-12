@@ -10,6 +10,7 @@ import { Plus, MoreHorizontal, Building2, Search } from 'lucide-react';
 import { useStores, useUpdateStore, useDeleteStore } from '@/hooks/useStores';
 import { useToast } from '@/hooks/use-toast';
 import { usePackages } from '@/hooks/usePackages';
+import { usePrompts } from '@/hooks/usePrompts';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,9 +55,17 @@ export default function Stores() {
   const deleteStore = useDeleteStore();
   const { toast } = useToast();
   const { data: packagesResp } = usePackages();
+  const { data: promptsResp } = usePrompts('global');
   const packageList: any[] = (packagesResp?.data || []);
   const packageIdToName: Record<string, string> = Object.fromEntries(
     packageList.map((p: any) => [p.package_id, p.name])
+  );
+  const promptsList: any[] = (promptsResp?.data || []);
+  const promptIdToName: Record<string, string> = Object.fromEntries(
+    promptsList.map((p: any) => [p.prompt_id, p.name])
+  );
+  const promptTextToName: Record<string, string> = Object.fromEntries(
+    promptsList.map((p: any) => [String(p.prompt_text || '').toLowerCase(), p.name])
   );
 
   function formatDateShort(d: string | Date | null | undefined): string {
@@ -109,6 +118,10 @@ export default function Stores() {
     refunded_jobs_count: s.refunded_jobs_count,
     per_image_credit: s.per_image_credit,
     package_id: s.package_id,
+    prompt1_id: (s as any).prompt1_id,
+    prompt_1: s.prompt_1,
+    prompt_name: ((s as any).prompt1_id && promptIdToName[(s as any).prompt1_id])
+      || (s.prompt_1 ? (promptTextToName[String(s.prompt_1).toLowerCase()] || '—') : '—'),
     package:
       Number(s.total_top_ups_egp || 0) > 0
         ? (s.package_id ? (packageIdToName[s.package_id] || '—') : 'Trial')
@@ -198,6 +211,12 @@ export default function Stores() {
       render: (row) => {
         return row.package || 'Trial';
       },
+    },
+    {
+      key: 'prompt_name',
+      label: 'Prompt',
+      sortable: true,
+      render: (row) => row.prompt_name || '—',
     },
     {
       key: 'total_top_ups_egp',
@@ -348,7 +367,7 @@ export default function Stores() {
               onSort={(key, direction) => { setSortKey(key); setSortDir(direction); }}
               defaultVisibleColumns={columns
                 .map((c) => c.key)
-                .filter((k) => !['max_images_per_hour', 'max_images_per_msg', 'store_kind', 'address'].includes(k))}
+                .filter((k) => !['max_images_per_hour', 'max_images_per_msg', 'store_kind', 'address', 'whatsapp_numbers_count'].includes(k))}
               rowClassName="hover:bg-indigo-50/80 transition-colors"
             />
           </div>

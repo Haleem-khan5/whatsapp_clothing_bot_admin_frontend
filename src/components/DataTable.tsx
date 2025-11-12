@@ -36,6 +36,7 @@ interface DataTableProps<T> {
   searchable?: boolean;
   onSearch?: (query: string) => void;
   rowClassName?: string;
+  defaultVisibleColumns?: string[];
 }
 
 export function DataTable<T extends { id?: string | number }>({
@@ -49,9 +50,12 @@ export function DataTable<T extends { id?: string | number }>({
   searchable = true,
   onSearch,
   rowClassName,
+  defaultVisibleColumns,
 }: DataTableProps<T>) {
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
-    columns.map((c) => c.key)
+    defaultVisibleColumns && defaultVisibleColumns.length > 0
+      ? defaultVisibleColumns
+      : columns.map((c) => c.key)
   );
   const [sortConfig, setSortConfig] = useState<{
     key: string;

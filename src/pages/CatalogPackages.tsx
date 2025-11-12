@@ -14,6 +14,8 @@ export default function CatalogPackages() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<PackageDef | null>(null);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [form, setForm] = useState<Partial<PackageDef>>({
     name: '',
     price_per_dress: 0,
@@ -31,11 +33,22 @@ export default function CatalogPackages() {
     refetch();
   }, [q, refetch]);
 
+  function formatInt(n: any): string {
+    const num = Number(n || 0);
+    if (!isFinite(num)) return '0';
+    return Math.trunc(num).toLocaleString('en-US');
+  }
+
   const columns: Column<any>[] = [
     { key: 'name', label: 'Name', sortable: true },
-    { key: 'price_per_dress', label: 'Price/Dress', sortable: true },
+    {
+      key: 'price_per_dress',
+      label: 'Price/Dress',
+      sortable: true,
+      render: (row) => formatInt(row.price_per_dress),
+    },
     { key: 'currency', label: 'Currency', sortable: true },
-    { key: 'images_per_dress', label: 'Images/Dress', sortable: true },
+    { key: 'images_per_dress', label: 'Images/Dress', sortable: true, render: (row) => formatInt(row.images_per_dress) },
     {
       key: 'use_consistent_background',
       label: 'Consistent BG',
@@ -47,18 +60,8 @@ export default function CatalogPackages() {
       label: 'Prompts Order',
       render: (row) => Array.isArray(row.prompts_order) ? row.prompts_order.join(', ') : String(row.prompts_order || ''),
     },
-    {
-      key: 'created_at',
-      label: 'Created',
-      render: (row) => (row.created_at ? new Date(row.created_at).toLocaleString() : '-'),
-      sortable: true,
-    },
-    {
-      key: 'updated_at',
-      label: 'Updated',
-      render: (row) => (row.updated_at ? new Date(row.updated_at).toLocaleString() : '-'),
-      sortable: true,
-    },
+    { key: 'created_at', label: 'Created', render: (row) => (row.created_at ? new Date(row.created_at).toLocaleString() : '-'), sortable: true },
+    { key: 'updated_at', label: 'Updated', render: (row) => (row.updated_at ? new Date(row.updated_at).toLocaleString() : '-'), sortable: true },
     {
       key: 'actions',
       label: '',
@@ -152,7 +155,31 @@ export default function CatalogPackages() {
           </div>
         </CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={(data?.data || []) as PackageDef[]} searchable={false} />
+          <DataTable
+            columns={columns}
+            data={(() => {
+              const list = (data?.data || []) as PackageDef[];
+              if (!sortKey) return list;
+              const arr = [...list];
+              arr.sort((a: any, b: any) => {
+                const va = a[sortKey as any];
+                const vb = b[sortKey as any];
+                const dir = sortDir === 'asc' ? 1 : -1;
+                const numA = typeof va === 'number' ? va : (typeof va === 'string' && va.trim() !== '' && !isNaN(Number(va)) ? Number(va) : NaN);
+                const numB = typeof vb === 'number' ? vb : (typeof vb === 'string' && vb.trim() !== '' && !isNaN(Number(vb)) ? Number(vb) : NaN);
+                if (Number.isFinite(numA) && Number.isFinite(numB)) return (numA - numB) * dir;
+                const da = typeof va === 'string' ? Date.parse(va) : NaN;
+                const db = typeof vb === 'string' ? Date.parse(vb) : NaN;
+                if (Number.isFinite(da) && Number.isFinite(db)) return (da - db) * dir;
+                const sa = String(va ?? '').toLowerCase();
+                const sb = String(vb ?? '').toLowerCase();
+                return sa.localeCompare(sb) * dir;
+              });
+              return arr;
+            })()}
+            searchable={false}
+            onSort={(key, direction) => { setSortKey(key); setSortDir(direction); }}
+          />
         </CardContent>
       </Card>
 

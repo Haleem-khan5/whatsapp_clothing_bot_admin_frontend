@@ -86,7 +86,7 @@ export default function Stores() {
   function formatInt(n: any): string {
     const num = Number(n || 0);
     if (!isFinite(num)) return '0';
-    return String(Math.trunc(num));
+    return Math.trunc(num).toLocaleString('en-US');
   }
 
   // Map and filter data
@@ -109,6 +109,10 @@ export default function Stores() {
     refunded_jobs_count: s.refunded_jobs_count,
     per_image_credit: s.per_image_credit,
     package_id: s.package_id,
+    package:
+      Number(s.total_top_ups_egp || 0) > 0
+        ? (s.package_id ? (packageIdToName[s.package_id] || '—') : 'Trial')
+        : 'Trial',
   }));
 
   let filteredStores = stores.filter((store) =>
@@ -188,13 +192,11 @@ export default function Stores() {
       render: (row) => formatDateTimeShort(row.last_active_at),
     },
     {
-      key: 'package',
+      key: 'per_image_credit',
       label: 'Package',
+      sortable: true,
       render: (row) => {
-        const hasTopUps = Number(row.total_top_ups_egp || 0) > 0;
-        if (!hasTopUps) return 'Trial';
-        if (row.package_id) return packageIdToName[row.package_id] || '—';
-        return 'Trial';
+        return row.package || 'Trial';
       },
     },
     {
@@ -203,7 +205,7 @@ export default function Stores() {
       sortable: true,
       render: (row) => formatInt(row.total_top_ups_egp),
     },
-    { key: 'image_jobs_count', label: 'Image Jobs', sortable: true },
+    { key: 'image_jobs_count', label: 'Image Jobs', sortable: true, render: (row) => formatInt(row.image_jobs_count) },
     {
       key: 'credit_remaining_egp',
       label: 'Credit Remaining (EGP)',
@@ -218,19 +220,19 @@ export default function Stores() {
         const credit = Number(row.credit_remaining_egp || 0);
         const per = Number(row.per_image_credit || 0);
         if (!per || per <= 0) return '0';
-        return String(Math.floor(credit / per));
+        return Math.floor(credit / per).toLocaleString('en-US');
       },
     },
-    { key: 'video_jobs_count', label: 'Video Jobs', sortable: true },
-    { key: 'refunded_jobs_count', label: 'Refunded Jobs', sortable: true },
-    { key: 'whatsapp_numbers_count', label: 'Whatsapp Numbers', sortable: true },
-    { key: 'max_images_per_hour', label: 'Max/Hr', sortable: true },
-    { key: 'max_images_per_msg', label: 'Max/Msg', sortable: true },
+    { key: 'video_jobs_count', label: 'Video Jobs', sortable: true, render: (row) => formatInt(row.video_jobs_count) },
+    { key: 'refunded_jobs_count', label: 'Refunded Jobs', sortable: true, render: (row) => formatInt(row.refunded_jobs_count) },
+    { key: 'whatsapp_numbers_count', label: 'Whatsapp Numbers', sortable: true, render: (row) => formatInt(row.whatsapp_numbers_count) },
+    { key: 'max_images_per_hour', label: 'Max/Hr', sortable: true, render: (row) => formatInt(row.max_images_per_hour) },
+    { key: 'max_images_per_msg', label: 'Max/Msg', sortable: true, render: (row) => formatInt(row.max_images_per_msg) },
     { key: 'store_kind', label: 'Type', sortable: true },
     { key: 'address', label: 'Address' },
     {
       key: 'actions',
-      label: '',
+      label: 'Edit',
       render: (row) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -344,6 +346,9 @@ export default function Stores() {
               data={filteredStores}
               searchable={false} // ✅ disables inner search bar
               onSort={(key, direction) => { setSortKey(key); setSortDir(direction); }}
+              defaultVisibleColumns={columns
+                .map((c) => c.key)
+                .filter((k) => !['max_images_per_hour', 'max_images_per_msg', 'store_kind', 'address'].includes(k))}
               rowClassName="hover:bg-indigo-50/80 transition-colors"
             />
           </div>

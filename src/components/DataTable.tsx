@@ -131,7 +131,14 @@ export function DataTable<T extends { id?: string | number }>({
                   <TableHead key={column.key}>
                     {column.sortable ? (
                       <div className="flex items-center gap-1">
-                        <span>{column.label}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="-ml-2 px-2"
+                          onClick={() => handleSort(column.key)}
+                        >
+                          {column.label}
+                        </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="-ml-1 px-1">

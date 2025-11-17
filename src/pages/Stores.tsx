@@ -205,7 +205,7 @@ export default function Stores() {
       render: (row) => formatDateTimeShort(row.last_active_at),
     },
     {
-      key: 'per_image_credit',
+      key: 'package',
       label: 'Package',
       sortable: true,
       render: (row) => {

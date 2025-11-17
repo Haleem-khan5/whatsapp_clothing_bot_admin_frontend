@@ -73,6 +73,8 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
         prompt3_id: s.prompt3_id,
         package_id: s.package_id,
         background_image_url: s.background_image_url,
+        model_height_pct: s.model_height_pct ?? 88,
+        model_bottom_offset_px: s.model_bottom_offset_px ?? 40,
         max_images_per_hour: s.max_images_per_hour,
         max_images_per_msg: s.max_images_per_msg,
         is_paused: !!s.is_paused,
@@ -89,6 +91,8 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
         prompt3_id: undefined,
         package_id: undefined,
         background_image_url: '',
+        model_height_pct: 88,
+        model_bottom_offset_px: 40,
         max_images_per_hour: 100,
         max_images_per_msg: 10,
         is_paused: false,
@@ -381,6 +385,43 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
                   })
                 }
                 required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="model_height_pct">Model Height (% of image)</Label>
+              <Input
+                id="model_height_pct"
+                type="number"
+                min={10}
+                max={100}
+                step="1"
+                value={formData.model_height_pct ?? 88}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    model_height_pct: Number(e.target.value),
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="model_bottom_offset_px">Bottom Offset (px from bottom)</Label>
+              <Input
+                id="model_bottom_offset_px"
+                type="number"
+                min={0}
+                max={400}
+                step="1"
+                value={formData.model_bottom_offset_px ?? 40}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    model_bottom_offset_px: Number(e.target.value),
+                  })
+                }
               />
             </div>
           </div>

@@ -16,6 +16,9 @@ export interface Store {
   max_images_per_hour: number;
   max_images_per_msg: number;
   is_paused?: boolean;
+   // Model framing controls for generated images
+  model_height_pct?: number; // e.g. 88 means 88% of image height
+  model_bottom_offset_px?: number; // e.g. 40px from bottom
   credit_remaining_egp?: number;
   remaining_quota_images?: number;
   shopify_collection_handle?: string;

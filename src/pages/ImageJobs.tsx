@@ -17,6 +17,7 @@ export default function ImageJobs() {
   const [storeId, setStoreId] = useState<string | undefined>(undefined);
   const [from, setFrom] = useState<string | undefined>(undefined);
   const [to, setTo] = useState<string | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data, isLoading } = useImageJobs({ ...filters, store_id: storeId, from, to });
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -36,10 +37,20 @@ export default function ImageJobs() {
       store_name: storeIdToName.get(j.store_id) || j.store_id,
     }));
   }, [data?.data, storeIdToName]);
+  const filteredRows = useMemo(() => {
+    if (!searchQuery.trim()) return rows;
+    const q = searchQuery.trim().toLowerCase();
+    return rows.filter((row: any) => {
+      const idVal = String(row.job_id ?? '').toLowerCase();
+      const nameVal = String(row.store_name ?? '').toLowerCase();
+      return idVal.includes(q) || nameVal.includes(q);
+    });
+  }, [rows, searchQuery]);
 
   const sortedRows = useMemo(() => {
-    if (!sortKey) return rows;
-    const arr = [...rows];
+    const base = filteredRows;
+    if (!sortKey) return base;
+    const arr = [...base];
     arr.sort((a: any, b: any) => {
       const va = a[sortKey as any];
       const vb = b[sortKey as any];
@@ -62,7 +73,7 @@ export default function ImageJobs() {
       return sa.localeCompare(sb) * dir;
     });
     return arr;
-  }, [rows, sortKey, sortDir]);
+  }, [filteredRows, sortKey, sortDir]);
 
   const columns: Column<any>[] = [
     { key: 'job_id', label: '🆔 Job ID', sortable: true },
@@ -294,7 +305,7 @@ export default function ImageJobs() {
         <CardHeader>
           <CardTitle className="text-purple-700 text-lg font-semibold">Filters</CardTitle>
           <CardDescription className="text-purple-400 font-medium">
-            Filter by store and date range.
+            Filter by store, date range, or search by Job ID or store name.
           </CardDescription>
         </CardHeader>
         <Separator className="bg-gradient-to-r from-purple-400 to-pink-400 h-[2px] my-1 rounded" />
@@ -324,9 +335,16 @@ export default function ImageJobs() {
               <input type="date" className="h-9 rounded-md border bg-background px-3 text-sm"
                 value={to || ''} onChange={(e) => setTo(e.target.value || undefined)} />
             </div>
-            <Button variant="outline" onClick={() => { /* rely on reactive query */ }} className="border-purple-400 text-purple-700 hover:bg-purple-100 hover:text-purple-800 transition-all">
-              Apply Filters
-            </Button>
+            <div className="space-y-1 flex-1">
+              <label className="text-sm text-gray-700 font-medium">Search</label>
+              <input
+                type="text"
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                placeholder="Type job ID or store name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -9,6 +9,7 @@ export interface ErrorLog {
   media_type?: string;
   stage?: string;
   provider?: string;
+  kind?: string;
   timestamp: string;
   error_message?: string;
   shopify_endpoint?: string;
@@ -22,6 +23,7 @@ export interface ErrorFilters {
   job_id?: string;
   from?: string;
   to?: string;
+  kind?: string;
 }
 
 export function useErrors(filters?: ErrorFilters) {

@@ -86,7 +86,6 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
         store_name: '',
         store_kind: 'Market',
         address: '',
-        prompt_1: '',
         prompt2_id: undefined,
         prompt3_id: undefined,
         package_id: undefined,
@@ -127,14 +126,17 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
         setIsUploading(false);
       }
 
+      // Do not persist prompt_1 text; rely on prompt1_id to fetch latest prompt from backend
+      const { prompt_1, ...cleanForm } = formData as any;
+
       if (store?.id) {
-        await updateStore.mutateAsync({ id: store.id, data: { ...formData, background_image_url: backgroundUrl } });
+        await updateStore.mutateAsync({ id: store.id, data: { ...cleanForm, background_image_url: backgroundUrl } });
         toast({
           title: 'Store updated',
           description: 'The store has been updated successfully.',
         });
       } else {
-        await createStore.mutateAsync({ ...formData, background_image_url: backgroundUrl });
+        await createStore.mutateAsync({ ...cleanForm, background_image_url: backgroundUrl });
         toast({
           title: 'Store created',
           description: 'The store has been created successfully.',
@@ -209,8 +211,7 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
             <Select
               value={formData.prompt1_id || ''}
               onValueChange={(value: any) => {
-                const p = (promptsData?.data || []).find((pp: any) => pp.prompt_id === value);
-                setFormData({ ...formData, prompt1_id: value || undefined, prompt_1: p ? p.prompt_text : '' });
+                setFormData({ ...formData, prompt1_id: value || undefined });
               }}
             >
               <SelectTrigger id="prompt1_id" className="w-full">
@@ -360,14 +361,16 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
               <Label htmlFor="max_images_per_hour">Max Images/Hour *</Label>
               <Input
                 id="max_images_per_hour"
-                type="number"
-                value={formData.max_images_per_hour}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    max_images_per_hour: parseInt(e.target.value),
-                  })
-                }
+              type="number"
+              value={formData.max_images_per_hour}
+              onChange={(e) => {
+                const val = e.target.value;
+                const parsed = val === '' ? 0 : parseInt(val, 10);
+                setFormData({
+                  ...formData,
+                  max_images_per_hour: Number.isFinite(parsed) ? parsed : 0,
+                });
+              }}
                 required
               />
             </div>
@@ -377,13 +380,15 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
               <Input
                 id="max_images_per_msg"
                 type="number"
-                value={formData.max_images_per_msg}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    max_images_per_msg: parseInt(e.target.value),
-                  })
-                }
+              value={formData.max_images_per_msg}
+              onChange={(e) => {
+                const val = e.target.value;
+                const parsed = val === '' ? 0 : parseInt(val, 10);
+                setFormData({
+                  ...formData,
+                  max_images_per_msg: Number.isFinite(parsed) ? parsed : 0,
+                });
+              }}
                 required
               />
             </div>

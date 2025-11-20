@@ -7,8 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
 export default function ErrorLogs() {
-  const [filters, setFilters] = useState({ page: 1, page_size: 20 });
-  const { data, isLoading, isFetching, refetch } = useErrors();
+  const [filters] = useState<{ kind?: string }>({});
+  const [logKind, setLogKind] = useState<'all' | 'error' | 'store_deletion'>('all');
+  const effectiveFilters = useMemo(
+    () =>
+      logKind === 'all'
+        ? filters
+        : { ...filters, kind: logKind === 'error' ? 'error' : 'store_deletion' },
+    [filters, logKind],
+  );
+  const { data, isLoading, isFetching, refetch } = useErrors(effectiveFilters);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -34,6 +42,7 @@ export default function ErrorLogs() {
 
   const columns: Column<any>[] = [
     { key: 'error_id', label: '🆔 Error ID', sortable: true },
+    { key: 'kind', label: '📂 Type', sortable: true },
     { key: 'store_name', label: '🏪 Store Name', sortable: true },
     { key: 'job_id', label: '🧩 Job ID', sortable: true },
     { key: 'media_type', label: '🖼️ Media Type', sortable: true },
@@ -68,9 +77,48 @@ export default function ErrorLogs() {
             <h1 className="text-4xl font-extrabold tracking-tight">Error Logs</h1>
             <p className="text-sm text-white/80 mt-1">Monitor processing and integration errors in real time.</p>
           </div>
-          <Button onClick={() => refetch()} disabled={isFetching} className="bg-white text-rose-600 hover:bg-rose-100 font-semibold shadow-md transition-all hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed">
-            {isFetching ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Refreshing...</> : 'Refresh'}
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex rounded-full bg-white/20 p-1 text-xs font-medium">
+              <button
+                className={`px-3 py-1 rounded-full transition-colors ${
+                  logKind === 'all' ? 'bg-white text-rose-600' : 'text-white/80'
+                }`}
+                onClick={() => setLogKind('all')}
+              >
+                All
+              </button>
+              <button
+                className={`px-3 py-1 rounded-full transition-colors ${
+                  logKind === 'error' ? 'bg-white text-rose-600' : 'text-white/80'
+                }`}
+                onClick={() => setLogKind('error')}
+              >
+                Errors
+              </button>
+              <button
+                className={`px-3 py-1 rounded-full transition-colors ${
+                  logKind === 'store_deletion' ? 'bg-white text-rose-600' : 'text-white/80'
+                }`}
+                onClick={() => setLogKind('store_deletion')}
+              >
+                Store deletions
+              </button>
+            </div>
+            <Button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="bg-white text-rose-600 hover:bg-rose-100 font-semibold shadow-md transition-all hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isFetching ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Refreshing...
+                </>
+              ) : (
+                'Refresh'
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 

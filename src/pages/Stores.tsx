@@ -47,6 +47,7 @@ export default function Stores() {
   const [confirmTarget, setConfirmTarget] = useState<any>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
@@ -273,7 +274,16 @@ export default function Stores() {
             <DropdownMenuItem onClick={() => { setConfirmTarget(row); setConfirmOpen(true); }} className="hover:bg-indigo-50">
               {row.is_paused ? 'Resume' : 'Pause'}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { setDeleteTarget(row); setDeleteOpen(true); }} className="text-red-600 hover:bg-red-50">Delete</DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setDeleteTarget(row);
+                setDeleteConfirmText('');
+                setDeleteOpen(true);
+              }}
+              className="text-red-600 hover:bg-red-50"
+            >
+              Delete
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -403,12 +413,24 @@ export default function Stores() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete store?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove {deleteTarget?.store_name} from the list. You can’t undo this.
+              This will permanently delete <span className="font-semibold">{deleteTarget?.store_name}</span> and
+              all of its WhatsApp numbers, phones, jobs, transactions and logs. This action cannot be undone.
+              <br />
+              <br />
+              To confirm, type the store name exactly as shown:
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="mt-2">
+            <Input
+              placeholder={deleteTarget?.store_name || 'Store name'}
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              disabled={!deleteTarget || deleteConfirmText !== (deleteTarget?.store_name || '')}
               onClick={async () => {
                 if (!deleteTarget) return;
                 try {
@@ -423,10 +445,11 @@ export default function Stores() {
                 } finally {
                   setDeleteOpen(false);
                   setDeleteTarget(null);
+                  setDeleteConfirmText('');
                 }
               }}
             >
-              Delete
+              Permanently delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

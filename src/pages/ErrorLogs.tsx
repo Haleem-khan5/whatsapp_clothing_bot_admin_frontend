@@ -8,7 +8,8 @@ import { Loader2 } from 'lucide-react';
 
 export default function ErrorLogs() {
   const [filters] = useState<{ kind?: string }>({});
-  const [logKind, setLogKind] = useState<'all' | 'error' | 'store_deletion'>('all');
+  // Default to showing regular errors first
+  const [logKind, setLogKind] = useState<'all' | 'error' | 'store_deletion'>('error');
   const effectiveFilters = useMemo(
     () =>
       logKind === 'all'
@@ -40,34 +41,122 @@ export default function ErrorLogs() {
     return arr;
   }, [rows, sortKey, sortDir]);
 
-  const columns: Column<any>[] = [
-    { key: 'error_id', label: '🆔 Error ID', sortable: true },
-    { key: 'kind', label: '📂 Type', sortable: true },
-    { key: 'store_name', label: '🏪 Store Name', sortable: true },
-    { key: 'job_id', label: '🧩 Job ID', sortable: true },
-    { key: 'media_type', label: '🖼️ Media Type', sortable: true },
-    { key: 'stage', label: '🛠️ Stage', sortable: true },
-    { key: 'provider', label: '🔌 Provider', sortable: true },
-    {
+  const columns: Column<any>[] = useMemo(() => {
+    const timestampColumn: Column<any> = {
       key: 'timestamp',
       label: '⏱ Timestamp (EG)',
       sortable: true,
       render: (row) =>
         row.timestamp
-          ? new Date(row.timestamp).toLocaleString('en-EG', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          ? new Date(row.timestamp).toLocaleString('en-EG', {
+              timeZone: 'Africa/Cairo',
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })
           : '-',
-    },
-    { key: 'error_message', label: '⚠️ Error Message' },
-    { key: 'shopify_endpoint', label: '🛍️ Shopify Endpoint' },
-    { key: 'http_status', label: '🌐 HTTP', sortable: true },
-    { key: 'error_code', label: '🧾 Error Code', sortable: true },
-    {
-      key: 'retryable',
-      label: '🔁 Retryable',
-      sortable: true,
-      render: (row) => (row.retryable === 'Y' ? 'Y' : 'N'),
-    },
-  ];
+    };
+
+    if (logKind === 'store_deletion') {
+      // Focused view for store deletion audits: highlight who deleted what and when
+      return [
+        { key: 'actor_full_name', label: '👤 Actor Name', sortable: true },
+        { key: 'actor_email', label: '📧 Actor Email', sortable: true },
+        { key: 'actor_role', label: '🛡 Role', sortable: true },
+        { key: 'store_name', label: '🏪 Store Name', sortable: true },
+        timestampColumn,
+        { key: 'error_message', label: '📋 Message', sortable: false },
+        { key: 'error_code', label: '🧾 Code', sortable: true },
+        { key: 'kind', label: '📂 Type', sortable: true },
+        { key: 'error_id', label: '🆔 Log ID', sortable: true },
+      ];
+    }
+
+    if (logKind === 'error') {
+      // Classic error view – only error-related columns
+      return [
+        { key: 'error_id', label: '🆔 Error ID', sortable: true },
+        { key: 'store_name', label: '🏪 Store Name', sortable: true },
+        { key: 'job_id', label: '🧩 Job ID', sortable: true },
+        { key: 'media_type', label: '🖼️ Media Type', sortable: true },
+        { key: 'stage', label: '🛠️ Stage', sortable: true },
+        { key: 'provider', label: '🔌 Provider', sortable: true },
+        timestampColumn,
+        { key: 'error_message', label: '⚠️ Error Message' },
+        { key: 'shopify_endpoint', label: '🛍️ Shopify Endpoint' },
+        { key: 'http_status', label: '🌐 HTTP', sortable: true },
+        { key: 'error_code', label: '🧾 Error Code', sortable: true },
+        {
+          key: 'retryable',
+          label: '🔁 Retryable',
+          sortable: true,
+          render: (row) => (row.retryable === 'Y' ? 'Y' : 'N'),
+        },
+      ];
+    }
+
+    // 'all' – superset view showing both error and audit details
+    return [
+      { key: 'error_id', label: '🆔 ID', sortable: true },
+      { key: 'kind', label: '📂 Type', sortable: true },
+      { key: 'actor_email', label: '👤 Actor Email', sortable: true },
+      { key: 'actor_full_name', label: '👤 Actor Name', sortable: true },
+      { key: 'actor_role', label: '🛡 Role', sortable: true },
+      { key: 'store_name', label: '🏪 Store Name', sortable: true },
+      { key: 'job_id', label: '🧩 Job ID', sortable: true },
+      { key: 'media_type', label: '🖼️ Media Type', sortable: true },
+      { key: 'stage', label: '🛠️ Stage', sortable: true },
+      { key: 'provider', label: '🔌 Provider', sortable: true },
+      timestampColumn,
+      { key: 'error_message', label: '⚠️ Error Message' },
+      { key: 'shopify_endpoint', label: '🛍️ Shopify Endpoint' },
+      { key: 'http_status', label: '🌐 HTTP', sortable: true },
+      { key: 'error_code', label: '🧾 Error Code', sortable: true },
+      {
+        key: 'retryable',
+        label: '🔁 Retryable',
+        sortable: true,
+        render: (row) => (row.retryable === 'Y' ? 'Y' : 'N'),
+      },
+    ];
+  }, [logKind]);
+
+  const defaultVisibleColumns = useMemo(() => {
+    if (logKind === 'store_deletion') {
+      // By default, show who deleted which store and when
+      return [
+        'actor_full_name',
+        'actor_email',
+        'store_name',
+        'timestamp',
+        'error_message',
+        'error_code',
+        'error_id',
+      ];
+    }
+    if (logKind === 'error') {
+      // Default error-focused view
+      return [
+        'error_id',
+        'store_name',
+        'job_id',
+        'media_type',
+        'stage',
+        'provider',
+        'timestamp',
+        'error_message',
+        'shopify_endpoint',
+        'http_status',
+        'error_code',
+        'retryable',
+      ];
+    }
+    // 'all' → start with all columns visible
+    return columns.map((c) => c.key);
+  }, [logKind, columns]);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -139,9 +228,14 @@ export default function ErrorLogs() {
               </div>
             )}
             <DataTable
+              key={logKind}
               columns={columns}
               data={sortedRows}
-              onSort={(key, direction) => { setSortKey(key); setSortDir(direction); }}
+              defaultVisibleColumns={defaultVisibleColumns}
+              onSort={(key, direction) => {
+                setSortKey(key);
+                setSortDir(direction);
+              }}
               searchable={false}
               rowClassName="hover:bg-rose-50/80 transition-colors"
             />

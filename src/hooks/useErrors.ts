@@ -9,6 +9,10 @@ export interface ErrorLog {
   media_type?: string;
   stage?: string;
   provider?: string;
+  actor_email?: string;
+  actor_full_name?: string;
+  actor_role?: string;
+  actor_user_id?: string;
   kind?: string;
   timestamp: string;
   error_message?: string;

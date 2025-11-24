@@ -111,17 +111,17 @@ export default function ErrorLogs() {
       { key: 'stage', label: '🛠️ Stage', sortable: true },
       { key: 'provider', label: '🔌 Provider', sortable: true },
       timestampColumn,
-      { key: 'error_message', label: '⚠️ Error Message' },
-      { key: 'shopify_endpoint', label: '🛍️ Shopify Endpoint' },
-      { key: 'http_status', label: '🌐 HTTP', sortable: true },
-      { key: 'error_code', label: '🧾 Error Code', sortable: true },
-      {
-        key: 'retryable',
-        label: '🔁 Retryable',
-        sortable: true,
-        render: (row) => (row.retryable === 'Y' ? 'Y' : 'N'),
-      },
-    ];
+    { key: 'error_message', label: '⚠️ Error Message' },
+    { key: 'shopify_endpoint', label: '🛍️ Shopify Endpoint' },
+    { key: 'http_status', label: '🌐 HTTP', sortable: true },
+    { key: 'error_code', label: '🧾 Error Code', sortable: true },
+    {
+      key: 'retryable',
+      label: '🔁 Retryable',
+      sortable: true,
+      render: (row) => (row.retryable === 'Y' ? 'Y' : 'N'),
+    },
+  ];
   }, [logKind]);
 
   const defaultVisibleColumns = useMemo(() => {
@@ -206,7 +206,7 @@ export default function ErrorLogs() {
               ) : (
                 'Refresh'
               )}
-            </Button>
+          </Button>
           </div>
         </div>
       </div>

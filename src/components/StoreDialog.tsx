@@ -361,13 +361,13 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
               <Label htmlFor="max_images_per_hour">Max Images/Hour *</Label>
               <Input
                 id="max_images_per_hour"
-              type="number"
-              value={formData.max_images_per_hour}
+                type="number"
+                value={formData.max_images_per_hour}
               onChange={(e) => {
                 const val = e.target.value;
                 const parsed = val === '' ? 0 : parseInt(val, 10);
-                setFormData({
-                  ...formData,
+                  setFormData({
+                    ...formData,
                   max_images_per_hour: Number.isFinite(parsed) ? parsed : 0,
                 });
               }}
@@ -380,12 +380,12 @@ export function StoreDialog({ open, onOpenChange, store }: StoreDialogProps) {
               <Input
                 id="max_images_per_msg"
                 type="number"
-              value={formData.max_images_per_msg}
+                value={formData.max_images_per_msg}
               onChange={(e) => {
                 const val = e.target.value;
                 const parsed = val === '' ? 0 : parseInt(val, 10);
-                setFormData({
-                  ...formData,
+                  setFormData({
+                    ...formData,
                   max_images_per_msg: Number.isFinite(parsed) ? parsed : 0,
                 });
               }}

@@ -118,6 +118,25 @@ export default function ImageJobs() {
         ),
     },
     {
+      key: 'raw_pose1_url',
+      label: '✨ Gemini 3.0 (with guides)',
+      render: (row) =>
+        row.raw_pose1_url ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-purple-600 hover:bg-purple-100 hover:text-purple-700 transition-all"
+            asChild
+          >
+            <a href={row.raw_pose1_url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </Button>
+        ) : (
+          '-'
+        ),
+    },
+    {
       key: 'front_pose_url',
       label: '💠 1st Pose (Front)',
       render: (row) =>

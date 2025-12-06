@@ -8,8 +8,9 @@ export interface ImageJob {
   timestamp: string;
   original_file_url?: string;
   front_pose_url?: string;
-  different_pose_url?: string;
+  diff_pose_url?: string;
   third_pose_url?: string;
+  raw_pose1_url?: string;
   time_received?: string;
   time_finished?: string;
   processing_time_sec?: number;

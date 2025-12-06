@@ -11,6 +11,11 @@ export interface Store {
   prompt3_id?: string;
   package_id?: string;
   background_image_url?: string;
+  logo_image_url?: string;
+  model_image_url?: string;
+  output_format?: '9:16' | '1:1';
+  output_resolution?: '1K' | '2K' | '4K';
+  credits_per_dress?: number;
   store_kind: 'Market' | 'Mall' | 'Personal';
   registration_date?: string;
   max_images_per_hour: number;

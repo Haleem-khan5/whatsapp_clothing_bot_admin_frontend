@@ -20,17 +20,31 @@ export default function BotMessages() {
   const [manualStoreId, setManualStoreId] = useState('');
   const [manualStoreSearch, setManualStoreSearch] = useState('');
   const [manualMessage, setManualMessage] = useState('');
+  const [filterStoreSearch, setFilterStoreSearch] = useState('');
 
   const sendManualMutation = useSendManualBotMessage();
   const runDailyMutation = useRunDailySummary();
 
-  const stores = useMemo(() => (storesData?.data || []) as any[], [storesData?.data]);
+  const stores = useMemo(
+    () =>
+      ((storesData?.data || []) as any[]).map((s: any) => ({
+        id: s.store_id,
+        store_name: s.store_name,
+      })),
+    [storesData?.data],
+  );
 
   const filteredManualStores = useMemo(() => {
     const q = manualStoreSearch.trim().toLowerCase();
     if (!q) return stores;
     return stores.filter((s) => String(s.store_name || '').toLowerCase().includes(q));
   }, [manualStoreSearch, stores]);
+
+  const filteredFilterStores = useMemo(() => {
+    const q = filterStoreSearch.trim().toLowerCase();
+    if (!q) return stores;
+    return stores.filter((s) => String(s.store_name || '').toLowerCase().includes(q));
+  }, [filterStoreSearch, stores]);
 
   const selectedManualStoreName =
     stores.find((s) => s.id === manualStoreId)?.store_name || 'No store selected';
@@ -342,13 +356,24 @@ export default function BotMessages() {
                 <SelectTrigger className="bg-white h-9 text-sm">
                   <SelectValue placeholder="All stores" />
                 </SelectTrigger>
-                <SelectContent className="max-h-60">
+                <SelectContent className="max-h-72">
+                  <div className="px-2 pb-2 sticky top-0 bg-white z-10">
+                    <Input
+                      placeholder="Search stores..."
+                      value={filterStoreSearch}
+                      onChange={(e) => setFilterStoreSearch(e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
                   <SelectItem value="__all_stores__">All stores</SelectItem>
-                  {stores.map((s) => (
+                  {filteredFilterStores.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.store_name}
                     </SelectItem>
                   ))}
+                  {filteredFilterStores.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-gray-500">No stores match your search.</div>
+                  )}
                 </SelectContent>
               </Select>
             </div>

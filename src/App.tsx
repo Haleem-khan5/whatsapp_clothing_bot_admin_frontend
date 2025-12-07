@@ -23,6 +23,7 @@ import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import ErrorLogs from "./pages/ErrorLogs";
+import BotMessages from "./pages/BotMessages";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/refunds" element={<Refunds />} />
               <Route path="/downloads" element={<Downloads />} />
               <Route path="/error-logs" element={<ErrorLogs />} />
+              <Route path="/bot-messages" element={<BotMessages />} />
               <Route path="/catalogs/credit" element={<CreditCatalog />} />
               <Route path="/catalogs/payment-for" element={<PaymentFor />} />
               <Route path="/catalogs/payment-method" element={<PaymentMethod />} />

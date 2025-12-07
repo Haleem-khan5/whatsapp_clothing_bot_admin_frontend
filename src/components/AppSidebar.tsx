@@ -12,6 +12,7 @@ import {
   Users,
   Settings,
   AlertTriangle,
+  MessageCircle,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -35,6 +36,7 @@ const mainItems = [
   { title: 'Refunds', url: '/refunds', icon: RotateCcw },
   { title: 'Downloads', url: '/downloads', icon: Download },
   { title: 'Error Logs', url: '/error-logs', icon: AlertTriangle },
+  { title: 'Bot Messages', url: '/bot-messages', icon: MessageCircle },
 ];
 
 const catalogItems = [

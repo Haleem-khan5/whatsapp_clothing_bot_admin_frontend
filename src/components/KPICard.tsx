@@ -1,10 +1,12 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { LucideIcon } from 'lucide-react';
 
 interface KPICardProps {
   title: string;
   value: string | number;
   icon: LucideIcon;
+  unit?: string;
+  helperText?: string;
   description?: string;
   trend?: {
     value: number;
@@ -12,27 +14,62 @@ interface KPICardProps {
   };
 }
 
-export function KPICard({ title, value, icon: Icon, description, trend }: KPICardProps) {
+export function KPICard({
+  title,
+  value,
+  icon: Icon,
+  unit,
+  helperText,
+  description,
+  trend,
+}: KPICardProps) {
+  const resolvedHelperText = helperText ?? description;
+
   return (
-    <Card className="overflow-hidden rounded-xl border border-indigo-100/70 bg-white/60 backdrop-blur-md shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-within:ring-2 focus-within:ring-indigo-300/50">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-[13px] font-semibold tracking-wide text-indigo-700">{title}</CardTitle>
-        <div className="h-7 w-7 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center ring-1 ring-indigo-100">
-          <Icon className="h-4 w-4" />
+    <Card className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+            <Icon className="h-5 w-5 text-slate-500" />
+          </div>
+
+          <div className="flex flex-1 flex-col">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold text-slate-600">{title}</p>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span className="text-2xl font-extrabold leading-none text-slate-900">
+                    {value}
+                  </span>
+                  {unit && (
+                    <span className="text-[11px] font-medium text-slate-500">
+                      {unit}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {trend && (
+                <span
+                  className={[
+                    'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                    trend.isPositive
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-rose-50 text-rose-700',
+                  ].join(' ')}
+                >
+                  {trend.isPositive ? '▲' : '▼'} {Math.abs(trend.value)}%
+                </span>
+              )}
+            </div>
+
+            {resolvedHelperText && (
+              <p className="mt-1 text-[11px] text-slate-500">
+                {resolvedHelperText}
+              </p>
+            )}
+          </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-extrabold tracking-tight text-gray-900">{value}</div>
-        {description && (
-          <p className="text-xs text-slate-600 mt-1">{description}</p>
-        )}
-        {trend && (
-          <span
-            className={`${trend.isPositive ? 'bg-green-50 text-green-700 ring-green-200' : 'bg-red-50 text-red-700 ring-red-200'} inline-flex items-center mt-2 rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1`}
-          >
-            {trend.isPositive ? '+' : ''}{trend.value}% from last period
-          </span>
-        )}
       </CardContent>
     </Card>
   );

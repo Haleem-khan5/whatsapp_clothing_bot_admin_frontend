@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DataTable, Column } from '@/components/DataTable';
 import { useImageJobs } from '@/hooks/useImageJobs';
 import { Badge } from '@/components/ui/badge';
@@ -286,6 +286,14 @@ export default function ImageJobs() {
       ),
     },
   ];
+
+  // Always fetch and show all matching image jobs (no paginated slices on this page)
+  useEffect(() => {
+    const total = data?.meta?.total || 0;
+    if (total > 0 && filters.page_size !== total) {
+      setFilters((prev) => ({ ...prev, page: 1, page_size: total }));
+    }
+  }, [data?.meta?.total, filters.page_size]);
 
   const handleExport = () => {
     console.log('Export data');

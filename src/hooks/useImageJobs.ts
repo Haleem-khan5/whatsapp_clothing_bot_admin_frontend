@@ -5,6 +5,9 @@ export interface ImageJob {
   job_id: string;
   store_id: string;
   phone_id: string;
+  try_number?: number;
+  store_number?: number;
+  friendly_job_id?: string;
   timestamp: string;
   original_file_url?: string;
   front_pose_url?: string;

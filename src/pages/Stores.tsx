@@ -1,12 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { DataTable, Column } from '@/components/DataTable';
 import { StoreDialog } from '@/components/StoreDialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Plus, MoreHorizontal, Building2, Search } from 'lucide-react';
+import { Plus, MoreHorizontal, Search } from 'lucide-react';
 import { useStores, useUpdateStore, useDeleteStore } from '@/hooks/useStores';
 import { useToast } from '@/hooks/use-toast';
 import { usePackages } from '@/hooks/usePackages';
@@ -28,26 +25,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
+type LastActiveFilter = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'all';
 
 export default function Stores() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedColumn, setSelectedColumn] = useState<'store_name' | 'store_kind' | 'address'>(
-    'store_name'
-  );
+  // Default to showing ALL stores; user can then narrow by "Today/This Week/etc."
+  const [lastActiveFilter, setLastActiveFilter] = useState<LastActiveFilter>('all');
+
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<any>(null);
+
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
@@ -55,13 +49,16 @@ export default function Stores() {
   const updateStore = useUpdateStore();
   const deleteStore = useDeleteStore();
   const { toast } = useToast();
+
   const { data: packagesResp } = usePackages();
   const { data: promptsResp } = usePrompts('global');
-  const packageList: any[] = (packagesResp?.data || []);
+
+  const packageList: any[] = packagesResp?.data || [];
   const packageIdToName: Record<string, string> = Object.fromEntries(
     packageList.map((p: any) => [p.package_id, p.name])
   );
-  const promptsList: any[] = (promptsResp?.data || []);
+
+  const promptsList: any[] = promptsResp?.data || [];
   const promptIdToName: Record<string, string> = Object.fromEntries(
     promptsList.map((p: any) => [p.prompt_id, p.name])
   );
@@ -70,19 +67,22 @@ export default function Stores() {
   );
 
   function formatDateShort(d: string | Date | null | undefined): string {
-    if (!d) return '-';
+    if (!d) return '—';
     const date = typeof d === 'string' ? new Date(d) : d;
-    if (!date || isNaN(date.getTime())) return '-';
+    if (!date || isNaN(date.getTime())) return '—';
     const month = date.toLocaleString('en-US', { month: 'short' });
     const day = date.getDate();
     const yy = String(date.getFullYear()).slice(-2);
     return `${month}-${day}-${yy}`;
   }
 
-  function formatDateTimeShort(d: string | Date | null | undefined, tz: string = 'Africa/Cairo'): string {
-    if (!d) return '-';
+  function formatDateTimeShort(
+    d: string | Date | null | undefined,
+    tz: string = 'Africa/Cairo'
+  ): string {
+    if (!d) return '—';
     const date = typeof d === 'string' ? new Date(d) : d;
-    if (!date || isNaN(date.getTime())) return '-';
+    if (!date || isNaN(date.getTime())) return '—';
     const datePart = formatDateShort(date);
     const timePart = date.toLocaleString('en-US', {
       timeZone: tz,
@@ -91,7 +91,7 @@ export default function Stores() {
       hour12: true,
     });
     return `${datePart}, ${timePart}`;
-    }
+  }
 
   function formatInt(n: any): string {
     const num = Number(n || 0);
@@ -99,63 +99,144 @@ export default function Stores() {
     return Math.trunc(num).toLocaleString('en-US');
   }
 
-  // Map and filter data
-  const stores = (data?.data || []).map((s: any) => ({
-    id: s.store_id,
-    store_name: s.store_name,
-    store_kind: s.store_kind,
-    address: s.address,
-    registration_date: s.registration_date,
-    max_images_per_hour: s.max_images_per_hour,
-    max_images_per_msg: s.max_images_per_msg,
-    is_paused: s.is_paused,
-    credit_remaining_egp: s.credit_remaining_egp,
-    remaining_quota_images: s.remaining_quota_images, // kept for compatibility
-    total_top_ups_egp: s.total_top_ups_egp,
-    image_jobs_count: s.image_jobs_count,
-    video_jobs_count: s.video_jobs_count,
-    last_active_at: s.last_active_at,
-    whatsapp_numbers_count: s.whatsapp_numbers_count,
-    refunded_jobs_count: s.refunded_jobs_count,
-    per_image_credit: s.per_image_credit,
-    package_id: s.package_id,
-    prompt1_id: (s as any).prompt1_id,
-    prompt_1: s.prompt_1,
-    prompt_name: ((s as any).prompt1_id && promptIdToName[(s as any).prompt1_id])
-      || (s.prompt_1 ? (promptTextToName[String(s.prompt_1).toLowerCase()] || '—') : '—'),
-    package:
-      Number(s.total_top_ups_egp || 0) > 0
-        ? (s.package_id ? (packageIdToName[s.package_id] || '—') : 'Trial')
-        : 'Trial',
-  }));
+  function isToday(dt: Date) {
+    const now = new Date();
+    return (
+      dt.getFullYear() === now.getFullYear() &&
+      dt.getMonth() === now.getMonth() &&
+      dt.getDate() === now.getDate()
+    );
+  }
 
-  let filteredStores = stores.filter((store) =>
-    store[selectedColumn]?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  function isYesterday(dt: Date) {
+    const now = new Date();
+    const y = new Date(now);
+    y.setDate(now.getDate() - 1);
+    return (
+      dt.getFullYear() === y.getFullYear() &&
+      dt.getMonth() === y.getMonth() &&
+      dt.getDate() === y.getDate()
+    );
+  }
 
-  // Apply sorting locally
+  function startOfWeek(d: Date) {
+    // Monday start
+    const x = new Date(d);
+    const day = (x.getDay() + 6) % 7; // 0 = Monday
+    x.setHours(0, 0, 0, 0);
+    x.setDate(x.getDate() - day);
+    return x;
+  }
+
+  function inThisWeek(dt: Date) {
+    const now = new Date();
+    const s = startOfWeek(now);
+    const e = new Date(s);
+    e.setDate(s.getDate() + 7);
+    return dt >= s && dt < e;
+  }
+
+  function inThisMonth(dt: Date) {
+    const now = new Date();
+    return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth();
+  }
+
+  const stores = useMemo(() => {
+    return (data?.data || []).map((s: any) => ({
+      id: s.store_id,
+      store_number: s.store_number,
+      store_name: s.store_name,
+      store_kind: s.store_kind,
+      address: s.address,
+      registration_date: s.registration_date,
+      max_images_per_hour: s.max_images_per_hour,
+      max_images_per_msg: s.max_images_per_msg,
+      is_paused: s.is_paused,
+      credit_remaining_egp: s.credit_remaining_egp,
+      remaining_quota_images: s.remaining_quota_images,
+      total_top_ups_egp: s.total_top_ups_egp,
+      transactions_count: s.transactions_count,
+      image_jobs_count: s.image_jobs_count,
+      video_jobs_count: s.video_jobs_count,
+      image_jobs_cost_egp: s.image_jobs_cost_egp,
+      video_jobs_cost_egp: s.video_jobs_cost_egp,
+      last_active_at: s.last_active_at,
+      whatsapp_numbers_count: s.whatsapp_numbers_count,
+      refunded_jobs_count: s.refunded_jobs_count,
+      refunds_egp: s.refunds_egp,
+      per_image_credit: s.per_image_credit,
+      package_id: s.package_id,
+      prompt1_id: (s as any).prompt1_id,
+      prompt_1: s.prompt_1,
+      prompt_name:
+        (((s as any).prompt1_id && promptIdToName[(s as any).prompt1_id]) ||
+          (s.prompt_1 ? promptTextToName[String(s.prompt_1).toLowerCase()] : null) ||
+          '—') ?? '—',
+      package:
+        Number(s.total_top_ups_egp || 0) > 0
+          ? s.package_id
+            ? packageIdToName[s.package_id] || '—'
+            : 'Trial'
+          : 'Trial',
+    }));
+  }, [data, packageIdToName, promptIdToName, promptTextToName]);
+
+  const totals = useMemo(() => {
+    const total = stores.length;
+    const active = stores.filter((s) => !s.is_paused).length;
+    const inactive = total - active;
+    return { total, active, inactive };
+  }, [stores]);
+
+  let filteredStores = stores;
+
+  // Search by store name (matches screenshot behavior)
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase();
+    filteredStores = filteredStores.filter((s) => String(s.store_name || '').toLowerCase().includes(q));
+  }
+
+  // Last active filters
+  filteredStores = filteredStores.filter((s) => {
+    if (lastActiveFilter === 'all') return true;
+    const dt = s.last_active_at ? new Date(s.last_active_at) : null;
+    if (!dt || isNaN(dt.getTime())) return false;
+
+    if (lastActiveFilter === 'today') return isToday(dt);
+    if (lastActiveFilter === 'yesterday') return isYesterday(dt);
+    if (lastActiveFilter === 'this_week') return inThisWeek(dt);
+    if (lastActiveFilter === 'this_month') return inThisMonth(dt);
+    return true;
+  });
+
+  // Local sorting (kept)
   if (sortKey) {
     filteredStores = [...filteredStores].sort((a: any, b: any) => {
       const va = a[sortKey];
       const vb = b[sortKey];
       const dir = sortDir === 'asc' ? 1 : -1;
-      // Numeric sort if both numbers or numeric-like strings
-      const numA = typeof va === 'number' ? va : (typeof va === 'string' && va.trim() !== '' && !isNaN(Number(va)) ? Number(va) : NaN);
-      const numB = typeof vb === 'number' ? vb : (typeof vb === 'string' && vb.trim() !== '' && !isNaN(Number(vb)) ? Number(vb) : NaN);
-      if (Number.isFinite(numA) && Number.isFinite(numB)) {
-        return (numA - numB) * dir;
-      }
-      // Boolean: false < true
-      if (typeof va === 'boolean' && typeof vb === 'boolean') {
+
+      const numA =
+        typeof va === 'number'
+          ? va
+          : typeof va === 'string' && va.trim() !== '' && !isNaN(Number(va))
+            ? Number(va)
+            : NaN;
+      const numB =
+        typeof vb === 'number'
+          ? vb
+          : typeof vb === 'string' && vb.trim() !== '' && !isNaN(Number(vb))
+            ? Number(vb)
+            : NaN;
+      if (Number.isFinite(numA) && Number.isFinite(numB)) return (numA - numB) * dir;
+
+      if (typeof va === 'boolean' && typeof vb === 'boolean')
         return ((va === vb ? 0 : va ? 1 : -1) as number) * dir;
-      }
-      // Date strings: try Date compare
+
       const da = typeof va === 'string' ? Date.parse(va) : NaN;
       const db = typeof vb === 'string' ? Date.parse(vb) : NaN;
-      if (Number.isFinite(da) && Number.isFinite(db)) {
-        return (da - db) * dir;
-      }
-      // Alphabetical (case-insensitive)
+      if (Number.isFinite(da) && Number.isFinite(db)) return (da - db) * dir;
+
       const sa = String(va ?? '').toLowerCase();
       const sb = String(vb ?? '').toLowerCase();
       return sa.localeCompare(sb) * dir;
@@ -191,87 +272,72 @@ export default function Stores() {
     setDialogOpen(true);
   };
 
+  // Columns order is intentionally aligned with the screenshot so we can style header bands via CSS nth-child.
   const columns: Column<any>[] = [
+    { key: 'store_number', label: 'St. #', sortable: true, render: (row) => row.store_number ?? '—' },
     { key: 'store_name', label: 'Store Name', sortable: true },
     {
       key: 'registration_date',
-      label: 'Registered on',
+      label: 'Registered',
       sortable: true,
       render: (row) => formatDateShort(row.registration_date),
-    },
-    {
-      key: 'last_active_at',
-      label: 'Last active',
-      sortable: true,
-      render: (row) => formatDateTimeShort(row.last_active_at),
     },
     {
       key: 'package',
       label: 'Package',
       sortable: true,
-      render: (row) => {
-        return row.package || 'Trial';
-      },
+      render: (row) => row.package || 'Trial',
     },
     {
-      key: 'prompt_name',
-      label: 'Prompt',
+      key: 'credit_per_job',
+      label: 'Credits/Job',
       sortable: true,
-      render: (row) => row.prompt_name || '—',
+      render: (row) => formatInt(row.per_image_credit),
     },
     {
-      key: 'total_top_ups_egp',
-      label: 'Top Ups',
+      key: 'active_status',
+      label: 'Active',
       sortable: true,
-      render: (row) => formatInt(row.total_top_ups_egp),
+      render: (row) => (row.is_paused ? 'Paused' : 'Active'),
     },
-    { key: 'image_jobs_count', label: 'Image Jobs', sortable: true, render: (row) => formatInt(row.image_jobs_count) },
+
+    { key: 'image_jobs_count', label: '#Image Jobs', sortable: true, render: (row) => formatInt(row.image_jobs_count) },
     {
-      key: 'credit_remaining_egp',
-      label: 'Credit Remaining (EGP)',
+      key: 'img_cr_used',
+      label: 'Img Cr Used (EGP)',
       sortable: true,
-      render: (row) => formatInt(row.credit_remaining_egp),
+      render: (row) => formatInt(row.image_jobs_cost_egp),
     },
-    {
-      key: 'image_jobs_credit',
-      label: 'Image Jobs Credit',
-      sortable: true,
-      render: (row) => {
-        const credit = Number(row.credit_remaining_egp || 0);
-        const per = Number(row.per_image_credit || 0);
-        if (!per || per <= 0) return '0';
-        return Math.floor(credit / per).toLocaleString('en-US');
-      },
-    },
-    { key: 'video_jobs_count', label: 'Video Jobs', sortable: true, render: (row) => formatInt(row.video_jobs_count) },
-    { key: 'refunded_jobs_count', label: 'Refunded Jobs', sortable: true, render: (row) => formatInt(row.refunded_jobs_count) },
-    { key: 'whatsapp_numbers_count', label: 'Whatsapp Numbers', sortable: true, render: (row) => formatInt(row.whatsapp_numbers_count) },
-    { key: 'max_images_per_hour', label: 'Max/Hr', sortable: true, render: (row) => formatInt(row.max_images_per_hour) },
-    { key: 'max_images_per_msg', label: 'Max/Msg', sortable: true, render: (row) => formatInt(row.max_images_per_msg) },
-    { key: 'store_kind', label: 'Type', sortable: true },
-    { key: 'address', label: 'Address' },
+    { key: 'credit_remaining_egp', label: 'Cr Rem (EGP)', sortable: true, render: (row) => formatInt(row.credit_remaining_egp) },
+    { key: 'transactions_count', label: '#Top Ups', sortable: true, render: (row) => formatInt(row.transactions_count) },
+    { key: 'total_top_ups_egp', label: 'Top Ups (EGP)', sortable: true, render: (row) => formatInt(row.total_top_ups_egp) },
+    { key: 'video_jobs_cost_egp', label: 'Vid Cr Used (EGP)', sortable: true, render: (row) => formatInt(row.video_jobs_cost_egp) },
+    { key: 'refunds_egp', label: 'Ref Cr (EGP)', sortable: true, render: (row) => formatInt(row.refunds_egp) },
+
+    { key: 'prompt_name', label: 'Prompt', sortable: true, render: (row) => row.prompt_name || '—' },
     {
       key: 'actions',
       label: 'Edit',
       render: (row) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="hover:bg-indigo-50">
-              <MoreHorizontal className="h-4 w-4 text-indigo-500" />
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-slate-100">
+              <MoreHorizontal className="h-4 w-4 text-slate-600" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="bg-white/90 backdrop-blur-md border border-indigo-100 shadow-md"
-          >
-            <DropdownMenuLabel className="text-indigo-600 font-medium">
-              Actions
-            </DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => handleEdit(row)} className="hover:bg-indigo-50">
+          <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md">
+            <DropdownMenuLabel className="text-slate-700 font-medium">Actions</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleEdit(row)} className="hover:bg-slate-50">
               Edit
             </DropdownMenuItem>
-            <DropdownMenuItem className="hover:bg-indigo-50">View Numbers</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { setConfirmTarget(row); setConfirmOpen(true); }} className="hover:bg-indigo-50">
+            <DropdownMenuItem className="hover:bg-slate-50">View Numbers</DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setConfirmTarget(row);
+                setConfirmOpen(true);
+              }}
+              className="hover:bg-slate-50"
+            >
               {row.is_paused ? 'Resume' : 'Pause'}
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -290,109 +356,152 @@ export default function Stores() {
     },
   ];
 
+  const lastActivePill = (key: LastActiveFilter, label: string) => {
+    const active = lastActiveFilter === key;
+    return (
+      <button
+        type="button"
+        onClick={() => setLastActiveFilter(key)}
+        className={[
+          'px-3 py-1 rounded-full text-xs font-medium border transition',
+          active
+            ? 'bg-slate-200 border-slate-300 text-slate-800 shadow-inner'
+            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
+        ].join(' ')}
+      >
+        {label}
+      </button>
+    );
+  };
+
   return (
-    <div className="space-y-8">
-      {/* HEADER */}
-      <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white rounded-2xl p-6 shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Building2 className="w-8 h-8 text-white/80" />
-            <div>
-              <h1 className="text-4xl font-extrabold tracking-tight">Store Management</h1>
-              <p className="text-sm text-white/80 mt-1">
-                Manage and monitor all registered stores efficiently.
-              </p>
-            </div>
+    <div className="w-full">
+      {/* Page background + tighter, screenshot-like spacing */}
+      <div className="rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white shadow-sm p-4 sm:p-5">
+        {/* Top stats pills (centered) */}
+        <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+          <div className="px-5 py-2 rounded-lg bg-white border border-slate-200 shadow-sm text-sm">
+            <span className="text-slate-700">Total stores registered - </span>
+            <span className="font-semibold text-slate-900">{formatInt(totals.total)}</span>
           </div>
+          <div className="px-5 py-2 rounded-lg bg-white border border-slate-200 shadow-sm text-sm">
+            <span className="text-slate-700">Total Active stores - </span>
+            <span className="font-semibold text-slate-900">{formatInt(totals.active)}</span>
+          </div>
+          <div className="px-5 py-2 rounded-lg bg-white border border-slate-200 shadow-sm text-sm">
+            <span className="text-slate-700">Total inactive stores - </span>
+            <span className="font-semibold text-slate-900">{formatInt(totals.inactive)}</span>
+          </div>
+        </div>
+
+        {/* Title row + Add Store */}
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h1 className="text-2xl font-bold text-slate-900">Store Management</h1>
+
           <Button
             onClick={handleAddNew}
-            className="bg-white text-purple-600 hover:bg-purple-100 font-semibold shadow-md transition-all hover:scale-105"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm"
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Store
           </Button>
         </div>
-      </div>
 
-      {/* FILTER BAR */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-xl shadow-sm border border-indigo-100 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:max-w-2xl">
-          {/* Search Input */}
-          <div className="w-full relative">
-            <label className="text-sm text-indigo-600 font-medium mb-1 block">
-              Search Store
-            </label>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-indigo-400" />
-              <Input
-                placeholder="Type to search..."
-                className="pl-8 border-indigo-200 focus-visible:ring-indigo-400"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+        {/* Search + Last Active pills */}
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-3">
+          <div className="relative w-full lg:max-w-2xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search Store Name..."
+              className="pl-9 bg-white border-slate-200 focus-visible:ring-slate-300"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between lg:justify-end gap-2 flex-wrap w-full">
+            <div className="text-sm font-medium text-slate-700 mr-1">Last Active</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {lastActivePill('today', 'Today')}
+              {lastActivePill('yesterday', 'Yesterday')}
+              {lastActivePill('this_week', 'This Week')}
+              {lastActivePill('this_month', 'This Month')}
+              {lastActivePill('all', 'All')}
             </div>
           </div>
+        </div>
 
-          {/* Column Selector */}
-          <div className="w-full sm:w-[200px]">
-            <label className="text-sm text-indigo-600 font-medium mb-1 block">
-              Search by
-            </label>
-            <Select
-              value={selectedColumn}
-              onValueChange={(val: any) => setSelectedColumn(val)}
-            >
-              <SelectTrigger className="border-indigo-200 focus:ring-indigo-400">
-                <SelectValue placeholder="Select column" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="store_name">Store Name</SelectItem>
-                <SelectItem value="store_kind">Type</SelectItem>
-                <SelectItem value="address">Address</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Table */}
+        <div className="rounded-md overflow-hidden border border-slate-200 bg-white stores-table">
+          <DataTable
+            columns={columns}
+            data={filteredStores}
+            searchable={false}
+            onSort={(key, direction) => {
+              setSortKey(key);
+              setSortDir(direction);
+            }}
+            defaultVisibleColumns={columns.map((c) => c.key)}
+            rowClassName="hover:bg-slate-50 transition-colors"
+          />
         </div>
       </div>
 
-      {/* TABLE CARD (no inner search) */}
-      <Card className="shadow-xl border-none bg-gradient-to-br from-white via-indigo-50 to-pink-50 rounded-2xl">
-        <CardHeader>
-          <CardTitle className="text-indigo-700 text-xl font-semibold">
-            Registered Stores
-          </CardTitle>
-          <CardDescription className="text-indigo-400 font-medium">
-            Below is the list of all active and paused stores.
-          </CardDescription>
-        </CardHeader>
+      {/* Scoped styling to match screenshot (banded header colors + thin grid) */}
+      <style jsx global>{`
+        .stores-table table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .stores-table thead th {
+          font-weight: 600;
+          font-size: 12px;
+          line-height: 1.2;
+          padding: 10px 8px;
+          border-bottom: 1px solid #d7dde6;
+          border-right: 1px solid #e3e8ef;
+          color: #1f2a37;
+          white-space: nowrap;
+        }
+        .stores-table tbody td {
+          font-size: 12px;
+          padding: 10px 8px;
+          border-bottom: 1px solid #eef2f7;
+          border-right: 1px solid #f0f3f8;
+          color: #111827;
+          white-space: nowrap;
+        }
+        .stores-table thead th:last-child,
+        .stores-table tbody td:last-child {
+          border-right: none;
+        }
 
-        <Separator className="bg-gradient-to-r from-indigo-400 to-pink-400 h-[2px] my-1 rounded" />
+        /* Header band colors (Overview = first 6 columns, Activity = next 7 columns, then Prompt/Edit) */
+        .stores-table thead th:nth-child(-n + 6) {
+          background: linear-gradient(180deg, #b9d7f5 0%, #9ec6ef 100%);
+        }
+        .stores-table thead th:nth-child(n + 7):nth-child(-n + 13) {
+          background: linear-gradient(180deg, #bfe6c6 0%, #a7dbb1 100%);
+        }
+        .stores-table thead th:nth-child(n + 14) {
+          background: linear-gradient(180deg, #eef2f7 0%, #e6ebf2 100%);
+        }
 
-        <CardContent>
-          <div className="rounded-xl overflow-hidden border border-indigo-100 shadow-sm bg-white/70 backdrop-blur-sm">
-            <DataTable
-              columns={columns}
-              data={filteredStores}
-              searchable={false} // ✅ disables inner search bar
-              onSort={(key, direction) => { setSortKey(key); setSortDir(direction); }}
-              defaultVisibleColumns={columns
-                .map((c) => c.key)
-                .filter((k) => !['max_images_per_hour', 'max_images_per_msg', 'store_kind', 'address', 'whatsapp_numbers_count'].includes(k))}
-              rowClassName="hover:bg-indigo-50/80 transition-colors"
-            />
-          </div>
-        </CardContent>
-      </Card>
+        /* Compact sort icons / controls (if your DataTable injects them) */
+        .stores-table thead th button,
+        .stores-table thead th .sort-btn {
+          color: inherit;
+        }
+      `}</style>
 
       {/* DIALOG */}
       <StoreDialog open={dialogOpen} onOpenChange={setDialogOpen} store={selectedStore} />
 
+      {/* Pause/Resume confirm */}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirmTarget?.is_paused ? 'Resume store?' : 'Pause store?'}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{confirmTarget?.is_paused ? 'Resume store?' : 'Pause store?'}</AlertDialogTitle>
             <AlertDialogDescription>
               {confirmTarget?.is_paused
                 ? `Resuming ${confirmTarget?.store_name} will allow processing pictures again.`
@@ -408,18 +517,20 @@ export default function Stores() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Delete confirm */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete store?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <span className="font-semibold">{deleteTarget?.store_name}</span> and
-              all of its WhatsApp numbers, phones, jobs, transactions and logs. This action cannot be undone.
+              This will permanently delete <span className="font-semibold">{deleteTarget?.store_name}</span> and all of its
+              WhatsApp numbers, phones, jobs, transactions and logs. This action cannot be undone.
               <br />
               <br />
               To confirm, type the store name exactly as shown:
             </AlertDialogDescription>
           </AlertDialogHeader>
+
           <div className="mt-2">
             <Input
               placeholder={deleteTarget?.store_name || 'Store name'}
@@ -427,6 +538,7 @@ export default function Stores() {
               onChange={(e) => setDeleteConfirmText(e.target.value)}
             />
           </div>
+
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
@@ -457,4 +569,3 @@ export default function Stores() {
     </div>
   );
 }
-

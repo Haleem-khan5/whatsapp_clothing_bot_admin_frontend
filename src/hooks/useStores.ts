@@ -3,6 +3,7 @@ import { api } from '@/lib/api';
 
 export interface Store {
   id: string;
+  store_number?: number;
   store_name: string;
   address?: string;
   prompt_1?: string;

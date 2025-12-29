@@ -3,7 +3,6 @@ import { useImageJobs } from '@/hooks/useImageJobs';
 import { useStores } from '@/hooks/useStores';
 import { useCommonThings, useUpdateExchangeRate } from '@/hooks/useCommonThings';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Search } from 'lucide-react';
@@ -18,7 +17,7 @@ export default function ImageJobs() {
   const [from, setFrom] = useState<string | undefined>(undefined);
   const [to, setTo] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
-  const [range, setRange] = useState<'this_week' | 'this_month' | 'all'>('this_week');
+  const [range, setRange] = useState<'today' | 'yesterday' | 'this_week' | 'this_month' | 'all'>('this_week');
 
   const { data, isLoading } = useImageJobs({ ...filters, store_id: storeId, from, to });
   const { data: storesResp } = useStores();
@@ -43,7 +42,58 @@ export default function ImageJobs() {
     }
   }, [currentExchangeRate]);
 
-  // Store metadata lookup: name, credits/job, resolution, etc.
+  // When range changes (Today / Yesterday / This Week / This Month / All), auto-set the from/to date filters.
+  useEffect(() => {
+    const toIso = (d: Date) => {
+      const year = d.getFullYear();
+      const month = `${d.getMonth() + 1}`.padStart(2, '0');
+      const day = `${d.getDate()}`.padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const today = new Date();
+
+    if (range === 'all') {
+      // Clear date filters to show all jobs
+      setFrom(undefined);
+      setTo(undefined);
+      return;
+    }
+
+    if (range === 'today') {
+      const start = new Date(today);
+      const end = new Date(today);
+      setFrom(toIso(start));
+      setTo(toIso(end));
+      return;
+    }
+
+    if (range === 'yesterday') {
+      const y = new Date(today);
+      y.setDate(today.getDate() - 1);
+      setFrom(toIso(y));
+      setTo(toIso(y));
+      return;
+    }
+
+    if (range === 'this_week') {
+      // Monday as start of week
+      const start = new Date(today);
+      const day = (start.getDay() + 6) % 7; // 0 = Monday
+      start.setDate(start.getDate() - day);
+      setFrom(toIso(start));
+      setTo(toIso(today));
+      return;
+    }
+
+    if (range === 'this_month') {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      setFrom(toIso(start));
+      setTo(toIso(today));
+    }
+  }, [range]);
+
+  // Store metadata lookup: name, credits/job, resolution, effective package.
   const storeMeta = useMemo(() => {
     const stores: any[] = storesResp?.data || [];
     const m = new Map<
@@ -52,6 +102,7 @@ export default function ImageJobs() {
         name: string;
         creditsPerJob?: number;
         outputResolution?: string;
+        packageLabel?: string;
       }
     >();
     for (const s of stores) {
@@ -61,11 +112,16 @@ export default function ImageJobs() {
           : s.credits_per_dress != null
             ? Number(s.credits_per_dress)
             : undefined;
+      const imgCost = Number(s.image_jobs_cost_egp || 0);
+      const freeTrialLimit = 200; // 200 EGP free trial credit
+      const basePackageName = s.package_id ? String(s.package_id_name || s.package_name || 'Basic') : 'Trial';
+      const effectivePackage = imgCost < freeTrialLimit ? 'Trial' : basePackageName || 'Trial';
 
       m.set(s.store_id, {
         name: s.store_name,
         creditsPerJob,
         outputResolution: s.output_resolution,
+        packageLabel: effectivePackage,
       });
     }
     return m;
@@ -77,9 +133,12 @@ export default function ImageJobs() {
       const meta = storeMeta.get(j.store_id);
       const storeName = meta?.name || j.store_id;
 
-      // Package label (used for pricing logic + badge)
-      const rawPkgLabel = j.package || j.package_name || (j.ready_for_publish ? 'Elite' : 'Pro');
-      const pkgLabel = String(rawPkgLabel || 'Pro').trim();
+      // Package label (used only for costing logic here) – prefer store-level effective package.
+      const rawPkgLabel = meta?.packageLabel || j.package || j.package_name || '';
+      let pkgLabel = String(rawPkgLabel || '').trim();
+      if (!pkgLabel) {
+        pkgLabel = 'Basic';
+      }
       const pkgLabelLower = pkgLabel.toLowerCase();
 
       // Credits / Job – primary source is store dashboard (per_image_credit / credits_per_dress)
@@ -99,8 +158,13 @@ export default function ImageJobs() {
 
       // Gemini cost (USD) based on package + resolution
       let geminiCostUsd = 0;
-      if (pkgLabelLower.includes('basic')) {
-        geminiCostUsd = 0.08;
+      if (pkgLabelLower.includes('elite')) {
+        if (resolution === '2K' || resolution === '4K') {
+          geminiCostUsd = 0.75;
+        } else {
+          // Default Elite tier (1K normal)
+          geminiCostUsd = 0.26;
+        }
       } else if (pkgLabelLower.includes('pro')) {
         const noBg =
           pkgLabelLower.includes('without background') ||
@@ -117,16 +181,20 @@ export default function ImageJobs() {
           // Fallback: treat generic "Pro" as with background
           geminiCostUsd = 0.14;
         }
-      } else if (pkgLabelLower.includes('elite')) {
-        if (resolution === '2K' || resolution === '4K') {
-          geminiCostUsd = 0.75;
-        } else {
-          // Default Elite tier (1K normal)
-          geminiCostUsd = 0.26;
-        }
+      } else {
+        // Default / Trial / Basic
+        geminiCostUsd = 0.08;
       }
 
-      const costComputed = geminiCostUsd * usdToEgp;
+      // Prefer persisted per-job cost from DB when present; fall back to computed.
+      const costFromDb =
+        typeof j.my_cost_egp === 'number'
+          ? j.my_cost_egp
+          : j.my_cost_egp != null
+            ? Number(j.my_cost_egp)
+            : undefined;
+
+      const costComputed = (costFromDb ?? geminiCostUsd * usdToEgp);
       const profitComputed = creditsPerJob - costComputed;
 
       return {
@@ -498,7 +566,7 @@ export default function ImageJobs() {
                 <th className="px-3 py-2 bg-[#cfe3f2] border-t border-slate-200 border-r">St #</th>
                 <th className="px-3 py-2 bg-[#cfe3f2] border-t border-slate-200 border-r">Job ID</th>
                 <th className="px-3 py-2 bg-[#cfe3f2] border-t border-slate-200 border-r">Store</th>
-                <th className="px-3 py-2 bg-[#cfe3f2] border-t border-slate-200 border-r">Package</th>
+                <th className="px-3 py-2 bg-[#cfe3f2] border-t border-slate-200 border-r">Time Stamp</th>
 
                 {/* Image processing */}
                 <th className="px-3 py-2 bg-[#d8efd9] border-t border-slate-200 border-r">Orig.</th>
@@ -509,6 +577,7 @@ export default function ImageJobs() {
                 <th className="px-3 py-2 bg-[#d8efd9] border-t border-slate-200 border-r">Proc(e)</th>
 
                 {/* Financials */}
+                <th className="px-3 py-2 bg-[#ead9fb] border-t border-slate-200 border-r">Error</th>
                 <th className="px-3 py-2 bg-[#ead9fb] border-t border-slate-200 border-r">Credits / Job</th>
                 <th className="px-3 py-2 bg-[#ead9fb] border-t border-slate-200 border-r">Gemini Costs (USD)</th>
                 <th className="px-3 py-2 bg-[#ead9fb] border-t border-slate-200 border-r">USD/EGP</th>
@@ -523,14 +592,6 @@ export default function ImageJobs() {
                 const procSec =
                   row.processing_time_sec != null ? `${Math.round(Number(row.processing_time_sec))}s` : '-';
 
-                // Package badge (if you have it; fallback to Ready/No)
-                const pkgLabel =
-                  row._pkgLabel ||
-                  row.package ||
-                  row.package_name ||
-                  (row.ready_for_publish ? 'Elite' : 'Pro');
-                const pkgVariant = pkgLabel?.toLowerCase?.().includes('elite') ? 'default' : 'secondary';
-
                 return (
                   <tr key={row.job_id || row.display_job_id} className="border-t border-slate-200">
                     {/* Overview */}
@@ -539,17 +600,24 @@ export default function ImageJobs() {
                       {row.display_job_id || '-'}
                     </td>
                     <td className="px-3 py-2 border-r border-slate-200 text-slate-800">{row.store_name || '-'}</td>
-                    <td className="px-3 py-2 border-r border-slate-200">
-                      <Badge
-                        variant={pkgVariant}
-                        className={
-                          pkgVariant === 'default'
-                            ? 'bg-[#7b4bb7] hover:bg-[#6d3eaa] text-white rounded-md px-2'
-                            : 'bg-[#2b6cb0] hover:bg-[#245f9c] text-white rounded-md px-2'
-                        }
-                      >
-                        {pkgLabel}
-                      </Badge>
+                    <td className="px-3 py-2 border-r border-slate-200 text-slate-700">
+                      {row.timestamp
+                        ? new Date(row.timestamp).toLocaleString('en-US', {
+                            year: '2-digit',
+                            month: 'short',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : row.created_at
+                          ? new Date(row.created_at).toLocaleString('en-US', {
+                              year: '2-digit',
+                              month: 'short',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : '—'}
                     </td>
 
                     {/* Image Processing thumbs */}
@@ -569,7 +637,7 @@ export default function ImageJobs() {
                       <Thumb url={row.third_pose_url} />
                     </td>
 
-                    {/* Proc(e) w/ failure pill like screenshot */}
+                {/* Proc(e) w/ failure pill */}
                     <td className="px-3 py-2 border-r border-slate-200">
                       <div className="flex items-center gap-2">
                         <span className="text-slate-800">{procSec}</span>
@@ -579,6 +647,11 @@ export default function ImageJobs() {
                           </span>
                         ) : null}
                       </div>
+                    </td>
+
+                    {/* Error column (text only when there is an error) */}
+                    <td className="px-3 py-2 border-r border-slate-200 text-rose-700 text-xs">
+                      {formatErrorCode(row.error_code)}
                     </td>
 
                     {/* Financials (computed on the dashboard) */}
@@ -605,7 +678,7 @@ export default function ImageJobs() {
 
               {/* Totals row (matches screenshot layout) */}
               <tr className="border-t border-slate-200 bg-slate-50 sticky bottom-0 z-20">
-                <td className="px-3 py-2 font-semibold text-slate-700" colSpan={10}>
+                <td className="px-3 py-2 font-semibold text-slate-700" colSpan={11}>
                   TOTALS
                 </td>
                 <td className="px-3 py-2 font-semibold text-slate-900 border-l border-slate-200">

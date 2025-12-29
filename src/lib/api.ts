@@ -13,9 +13,9 @@ const rawEnvBase: string | undefined =
 // // - use VITE_SERVER_URL when provided, else default to '/api' (Vite dev proxy)
 let envBase = (rawEnvBase || '/api') as string;
 
-envBase = "https://clothing-bot-uw4d.onrender.com";
+// envBase = "https://clothing-bot-uw4d.onrender.com";
 
-// envBase = "http://localhost:8000";
+envBase = "http://localhost:8000";
 if (envBase.startsWith('@')) envBase = envBase.slice(1);
 envBase = String(envBase).trim();
 const sanitized = (envBase || '/api').replace(/\/+$/, '');
@@ -51,6 +51,7 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
 
 // Response interceptor to standardize response format
 api.interceptors.response.use(

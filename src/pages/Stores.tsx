@@ -142,72 +142,102 @@ export default function Stores() {
   }
 
   const stores = useMemo(() => {
-    return (data?.data || []).map((s: any) => ({
-      id: s.store_id,
-      store_number: s.store_number,
-      store_name: s.store_name,
-      store_kind: s.store_kind,
-      address: s.address,
-      registration_date: s.registration_date,
-      max_images_per_hour: s.max_images_per_hour,
-      max_images_per_msg: s.max_images_per_msg,
-      is_paused: s.is_paused,
-      credit_remaining_egp: s.credit_remaining_egp,
-      remaining_quota_images: s.remaining_quota_images,
-      total_top_ups_egp: s.total_top_ups_egp,
-      transactions_count: s.transactions_count,
-      image_jobs_count: s.image_jobs_count,
-      video_jobs_count: s.video_jobs_count,
-      image_jobs_cost_egp: s.image_jobs_cost_egp,
-      video_jobs_cost_egp: s.video_jobs_cost_egp,
-      last_active_at: s.last_active_at,
-      whatsapp_numbers_count: s.whatsapp_numbers_count,
-      refunded_jobs_count: s.refunded_jobs_count,
-      refunds_egp: s.refunds_egp,
-      per_image_credit: s.per_image_credit,
-      package_id: s.package_id,
-      prompt1_id: (s as any).prompt1_id,
-      prompt_1: s.prompt_1,
-      prompt_name:
-        (((s as any).prompt1_id && promptIdToName[(s as any).prompt1_id]) ||
-          (s.prompt_1 ? promptTextToName[String(s.prompt_1).toLowerCase()] : null) ||
-          '—') ?? '—',
-      package:
-        Number(s.total_top_ups_egp || 0) > 0
-          ? s.package_id
-            ? packageIdToName[s.package_id] || '—'
-            : 'Trial'
-          : 'Trial',
-    }));
+    return (data?.data || []).map((s: any) => {
+      const basePackageName =
+        s.package_id && packageIdToName[s.package_id]
+          ? packageIdToName[s.package_id]
+          : 'Trial';
+
+      const imgCost = Number(s.image_jobs_cost_egp || 0);
+      const freeTrialLimit = 200; // 200 EGP free trial credit
+
+      // Stay in "Trial" until we've spent at least 200 EGP on image jobs,
+      // regardless of top-ups or selected package.
+      const effectivePackage =
+        imgCost < freeTrialLimit ? 'Trial' : basePackageName || 'Trial';
+
+      return {
+        id: s.store_id,
+        store_number: s.store_number,
+        store_name: s.store_name,
+        store_kind: s.store_kind,
+        address: s.address,
+        registration_date: s.registration_date,
+        max_images_per_hour: s.max_images_per_hour,
+        max_images_per_msg: s.max_images_per_msg,
+        is_paused: s.is_paused,
+        credit_remaining_egp: s.credit_remaining_egp,
+        remaining_quota_images: s.remaining_quota_images,
+        total_top_ups_egp: s.total_top_ups_egp,
+        transactions_count: s.transactions_count,
+        image_jobs_count: s.image_jobs_count,
+        video_jobs_count: s.video_jobs_count,
+        image_jobs_cost_egp: s.image_jobs_cost_egp,
+        video_jobs_cost_egp: s.video_jobs_cost_egp,
+        last_active_at: s.last_active_at,
+        whatsapp_numbers_count: s.whatsapp_numbers_count,
+        refunded_jobs_count: s.refunded_jobs_count,
+        refunds_egp: s.refunds_egp,
+        per_image_credit: s.per_image_credit,
+        package_id: s.package_id,
+        prompt1_id: (s as any).prompt1_id,
+        prompt_1: s.prompt_1,
+        prompt_name:
+          (((s as any).prompt1_id && promptIdToName[(s as any).prompt1_id]) ||
+            (s.prompt_1 ? promptTextToName[String(s.prompt_1).toLowerCase()] : null) ||
+            '—') ?? '—',
+        package: effectivePackage,
+      };
+    });
   }, [data, packageIdToName, promptIdToName, promptTextToName]);
 
+  // Helper to decide if a date falls into the selected Last Active filter window.
+  const inFilterRange = (raw: string | Date | null | undefined, filter: LastActiveFilter): boolean => {
+    if (filter === 'all') return true;
+    if (!raw) return false;
+    const dt = typeof raw === 'string' ? new Date(raw) : raw;
+    if (!dt || isNaN(dt.getTime())) return false;
+
+    if (filter === 'today') return isToday(dt);
+    if (filter === 'yesterday') return isYesterday(dt);
+    if (filter === 'this_week') return inThisWeek(dt);
+    if (filter === 'this_month') return inThisMonth(dt);
+    return true;
+  };
+
+  // Top summary stats:
+  // - Total stores registered: stores whose registration_date is in the selected period (or all, if "All").
+  // - Total Active stores: stores whose last_active_at is in the selected period AND not paused.
+  // - Total inactive (this period): ALL registered stores (overall) - active_in_period.
   const totals = useMemo(() => {
-    const total = stores.length;
-    const active = stores.filter((s) => !s.is_paused).length;
-    const inactive = total - active;
+    const totalRegisteredOverall = stores.length;
+
+    const registeredInPeriod = stores.filter((s) =>
+      lastActiveFilter === 'all' ? true : inFilterRange(s.registration_date, lastActiveFilter)
+    );
+
+    const activeInRange = stores.filter((s) => {
+      if (s.is_paused) return false;
+      if (lastActiveFilter === 'all') {
+        // For "All", treat any store with a last_active_at as active.
+        return !!s.last_active_at && !isNaN(new Date(s.last_active_at).getTime());
+      }
+      return inFilterRange(s.last_active_at, lastActiveFilter);
+    });
+
+    const active = activeInRange.length;
+    const total = registeredInPeriod.length;
+    const inactive = Math.max(0, totalRegisteredOverall - active);
     return { total, active, inactive };
-  }, [stores]);
+  }, [stores, lastActiveFilter]);
 
-  let filteredStores = stores;
+  // Table rows respect the Last Active filter on last_active_at, then search is applied.
+  let filteredStores = stores.filter((s) => inFilterRange(s.last_active_at, lastActiveFilter));
 
-  // Search by store name (matches screenshot behavior)
   if (searchQuery.trim()) {
     const q = searchQuery.toLowerCase();
     filteredStores = filteredStores.filter((s) => String(s.store_name || '').toLowerCase().includes(q));
   }
-
-  // Last active filters
-  filteredStores = filteredStores.filter((s) => {
-    if (lastActiveFilter === 'all') return true;
-    const dt = s.last_active_at ? new Date(s.last_active_at) : null;
-    if (!dt || isNaN(dt.getTime())) return false;
-
-    if (lastActiveFilter === 'today') return isToday(dt);
-    if (lastActiveFilter === 'yesterday') return isYesterday(dt);
-    if (lastActiveFilter === 'this_week') return inThisWeek(dt);
-    if (lastActiveFilter === 'this_month') return inThisMonth(dt);
-    return true;
-  });
 
   // Local sorting (kept)
   if (sortKey) {
@@ -286,7 +316,30 @@ export default function Stores() {
       key: 'package',
       label: 'Package',
       sortable: true,
-      render: (row) => row.package || 'Trial',
+      render: (row) => {
+        const label = String(row.package || 'Trial');
+        const lower = label.toLowerCase();
+
+        let bg = '#e5e7eb'; // Trial (gray)
+        let text = '#111827';
+
+        if (lower.includes('basic')) {
+          bg = '#bfdbfe'; // light blue
+        } else if (lower.includes('pro')) {
+          bg = '#bbf7d0'; // light green
+        } else if (lower.includes('elite')) {
+          bg = '#e9d5ff'; // light purple
+        }
+
+        return (
+          <span
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+            style={{ backgroundColor: bg, color: text }}
+          >
+            {label}
+          </span>
+        );
+      },
     },
     {
       key: 'credit_per_job',
@@ -298,7 +351,34 @@ export default function Stores() {
       key: 'active_status',
       label: 'Active',
       sortable: true,
-      render: (row) => (row.is_paused ? 'Paused' : 'Active'),
+      render: (row) => {
+        if (row.is_paused) {
+          return <span className="text-xs font-medium text-slate-500">Paused</span>;
+        }
+        const dt = row.last_active_at ? new Date(row.last_active_at) : null;
+        if (!dt || isNaN(dt.getTime())) {
+          return <span className="text-xs font-medium text-slate-400">—</span>;
+        }
+
+        const now = new Date();
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const diffDays = Math.floor((now.getTime() - dt.getTime()) / msPerDay);
+
+        let label: string;
+        if (diffDays <= 0 && isToday(dt)) {
+          label = 'Today';
+        } else if (diffDays === 1 || isYesterday(dt)) {
+          label = 'Yesterday';
+        } else {
+          label = `${diffDays} days ago`;
+        }
+
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">
+            {label}
+          </span>
+        );
+      },
     },
 
     { key: 'image_jobs_count', label: '#Image Jobs', sortable: true, render: (row) => formatInt(row.image_jobs_count) },
@@ -389,7 +469,7 @@ export default function Stores() {
             <span className="font-semibold text-slate-900">{formatInt(totals.active)}</span>
           </div>
           <div className="px-5 py-2 rounded-lg bg-white border border-slate-200 shadow-sm text-sm">
-            <span className="text-slate-700">Total inactive stores - </span>
+            <span className="text-slate-700">Total inactive stores (this period) - </span>
             <span className="font-semibold text-slate-900">{formatInt(totals.inactive)}</span>
           </div>
         </div>

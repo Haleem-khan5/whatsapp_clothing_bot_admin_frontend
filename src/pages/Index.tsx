@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { KPICard } from '@/components/KPICard';
 import {
   Store,
@@ -13,24 +13,90 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useKpi } from '@/hooks/useKpi';
+import { useKpi, type PresetRange } from '@/hooks/useKpi';
+
+type FixedRange =
+  | 'all'
+  | 'today'
+  | 'yesterday'
+  | 'this-week'
+  | 'last-week'
+  | 'this-month'
+  | 'last-month';
+
+const fixedRangeLabels: Record<FixedRange, string> = {
+  all: 'All',
+  today: 'Today',
+  yesterday: 'Yesterday',
+  'this-week': 'This Week',
+  'last-week': 'Last Week',
+  'this-month': 'This Month',
+  'last-month': 'Last Month',
+};
 
 const Index = () => {
-  const [dateRange, setDateRange] = useState('this-month');
+  const [dateRange, setDateRange] = useState<PresetRange>('all');
   const [from, setFrom] = useState<string | undefined>();
   const [to, setTo] = useState<string | undefined>();
 
-  const params = useMemo(
-    () => ({ range: dateRange as any, from, to }),
-    [dateRange, from, to],
-  );
-  const { data } = useKpi(params);
+  const isCustom = dateRange === 'custom';
 
-  const resp = data?.data;
+  // Progressive prefetch: start with ALL, then chain each range once the previous is ready.
+  const allQuery = useKpi({ range: 'all' });
+  const todayQuery = useKpi(allQuery.isSuccess ? { range: 'today' } : undefined);
+  const yesterdayQuery = useKpi(todayQuery.isSuccess ? { range: 'yesterday' } : undefined);
+  const thisWeekQuery = useKpi(yesterdayQuery.isSuccess ? { range: 'this-week' } : undefined);
+  const lastWeekQuery = useKpi(thisWeekQuery.isSuccess ? { range: 'last-week' } : undefined);
+  const thisMonthQuery = useKpi(lastWeekQuery.isSuccess ? { range: 'this-month' } : undefined);
+  const lastMonthQuery = useKpi(thisMonthQuery.isSuccess ? { range: 'last-month' } : undefined);
+
+  // Custom range: only fetched on demand when selected and dates are provided.
+  const customQuery = useKpi(
+    isCustom && from && to
+      ? { range: 'custom', from, to }
+      : undefined,
+  );
+
+  const queriesByFixedRange: Record<FixedRange, typeof allQuery> = {
+    all: allQuery,
+    today: todayQuery,
+    yesterday: yesterdayQuery,
+    'this-week': thisWeekQuery,
+    'last-week': lastWeekQuery,
+    'this-month': thisMonthQuery,
+    'last-month': lastMonthQuery,
+  };
+
+  // Build the list of available ranges based on which queries have finished successfully.
+  const availableFixedRanges: FixedRange[] = [];
+  (['all', 'today', 'yesterday', 'this-week', 'last-week', 'this-month', 'last-month'] as FixedRange[]).forEach(
+    (rk) => {
+      if (queriesByFixedRange[rk].isSuccess) {
+        availableFixedRanges.push(rk);
+      }
+    },
+  );
+
+  // Only enable the dropdown once at least the 'all' range has been loaded.
+  const hasAnyOption = availableFixedRanges.length > 0;
+
+  // Ensure the currently selected range is actually available; otherwise fall back to first available.
+  const effectiveDateRange: PresetRange =
+    dateRange === 'custom'
+      ? 'custom'
+      : (hasAnyOption && availableFixedRanges.includes(dateRange as FixedRange)
+          ? dateRange
+          : (availableFixedRanges[0] ?? 'all'));
+
+  const activeQuery =
+    effectiveDateRange === 'custom'
+      ? customQuery
+      : queriesByFixedRange[effectiveDateRange as FixedRange] ?? allQuery;
 
   const defaultKpi = {
     stores_total: 0,
     stores_new: 0,
+    active_stores: 0,
     transactions_egp: 0,
     refunds_egp: 0,
     image_jobs_count: 0,
@@ -39,10 +105,10 @@ const Index = () => {
     video_jobs_cost_egp: 0,
     net_cashflow_egp: 0,
 
-    stores_tier_basic_pct: 50,
-    stores_tier_pro_pct: 25,
-    stores_tier_elite_pct: 15,
-    stores_tier_trial_pct: 10,
+    stores_tier_basic_pct: 0,
+    stores_tier_pro_pct: 0,
+    stores_tier_elite_pct: 0,
+    stores_tier_trial_pct: 0,
 
     active_pct: 55,
     less_active_pct: 20,
@@ -60,12 +126,15 @@ const Index = () => {
     jobs_total: 0,
   };
 
-  const r = resp ?? defaultKpi;
+  const r = activeQuery.data?.data ?? defaultKpi;
 
   const formatNumber = (n: number | null | undefined) =>
     (n ?? 0).toLocaleString('en-US');
 
-  const revenueGross = r.transactions_egp ?? 0;
+  const revenueGross =
+    (typeof r.jobs_revenue_egp === 'number'
+      ? r.jobs_revenue_egp
+      : r.transactions_egp) ?? 0;
   const totalCosts = (r.image_jobs_cost_egp ?? 0) + (r.video_jobs_cost_egp ?? 0);
   const totalRefunds = r.refunds_egp ?? 0;
   const costsAndRefunds = totalCosts + totalRefunds;
@@ -122,26 +191,29 @@ const Index = () => {
 
             <div className="flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 shadow-sm">
               <Select
-                value={dateRange}
+                value={effectiveDateRange}
                 onValueChange={(v) => {
-                  setDateRange(v);
+                  setDateRange(v as PresetRange);
                   if (v !== 'custom') {
                     setFrom(undefined);
                     setTo(undefined);
                   }
                 }}
+                disabled={!hasAnyOption}
               >
                 <SelectTrigger className="h-6 w-[220px] border-0 bg-transparent p-0 text-xs shadow-none focus:ring-0">
-                  <SelectValue placeholder="This Month" />
+                  <SelectValue placeholder="Loading..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="yesterday">Yesterday</SelectItem>
-                  <SelectItem value="this-week">This Week</SelectItem>
-                  <SelectItem value="last-week">Last Week</SelectItem>
-                  <SelectItem value="this-month">This Month</SelectItem>
-                  <SelectItem value="last-month">Last Month</SelectItem>
-                  <SelectItem value="custom">Custom Range</SelectItem>
+                  {availableFixedRanges.map((rk) => (
+                    <SelectItem key={rk} value={rk}>
+                      {fixedRangeLabels[rk]}
+                    </SelectItem>
+                  ))}
+                  {/* Allow custom once we have at least one base KPI (ALL) */}
+                  {hasAnyOption && (
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
 
@@ -186,7 +258,7 @@ const Index = () => {
                       Stores Registered
                     </p>
                     <p className="text-xl font-extrabold text-slate-900">
-                      {formatNumber(r.stores_total)}
+                      {formatNumber(r.stores_new ?? r.stores_total)}
                     </p>
                   </div>
                 </div>
@@ -201,7 +273,7 @@ const Index = () => {
                       Active Stores
                     </p>
                     <p className="text-xl font-extrabold text-slate-900">
-                      {formatNumber(r.stores_new)}{' '}
+                      {formatNumber(r.active_stores)}{' '}
                       <span className="text-xs font-medium text-slate-500">
                         Active
                       </span>

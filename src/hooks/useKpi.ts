@@ -1,12 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
-export type PresetRange = 'today' | 'yesterday' | 'this-week' | 'last-week' | 'this-month' | 'last-month' | 'custom';
+export type PresetRange =
+  | 'all'
+  | 'today'
+  | 'yesterday'
+  | 'this-week'
+  | 'last-week'
+  | 'this-month'
+  | 'last-month'
+  | 'custom';
 
 export interface KpiFilters {
   range?: PresetRange;
   from?: string; // ISO yyyy-mm-dd
-  to?: string;   // ISO yyyy-mm-dd
+  to?: string; // ISO yyyy-mm-dd
 }
 
 export interface KpiResponse {
@@ -20,13 +28,16 @@ export interface KpiResponse {
   stores_new: number;         // active or new in range
 
   // ==== Financials (existing) ====
-  transactions_egp: number;      // revenue
+  transactions_egp: number;      // top-ups (cash in)
   refunds_egp: number;           // refunds
   image_jobs_count: number;
   image_jobs_cost_egp: number;
   video_jobs_count: number;
   video_jobs_cost_egp: number;
   net_cashflow_egp: number;      // (existing from API)
+
+  // ==== Revenue based on Credits / Job (image + video) ====
+  jobs_revenue_egp?: number;
 
   // ==== NEW — User Tier Distribution ====
   stores_tier_basic_pct?: number;   // e.g. 50
@@ -54,26 +65,34 @@ export interface KpiResponse {
   jobs_total?: number;           // 57,350
 
   // ==== Optional — Backend can send this directly ====
-  net_profit_egp?: number;  // optional computed field
+  net_profit_egp?: number; // optional computed field
 }
 
 
-function mapRangeToBackend(range?: PresetRange): string | undefined {
+export interface KpiBulkResponse {
+  by_range: Record<string, KpiResponse>;
+}
+
+
+export function mapRangeToBackend(range?: PresetRange): string | undefined {
   if (!range) return undefined;
   const map: Record<PresetRange, string> = {
-    'today': 'TODAY',
-    'yesterday': 'YESTERDAY',
+    all: 'ALL',
+    today: 'TODAY',
+    yesterday: 'YESTERDAY',
     'this-week': 'THIS_WEEK',
     'last-week': 'LAST_WEEK',
     'this-month': 'THIS_MONTH',
     'last-month': 'LAST_MONTH',
-    'custom': 'CUSTOM',
+    custom: 'CUSTOM',
   };
   return map[range];
 }
 
+
 export function useKpi(filters?: KpiFilters) {
   return useQuery({
+    // Cache per logical filter (range + from/to)
     queryKey: ['kpi', filters],
     queryFn: async () => {
       const params = {
@@ -83,6 +102,24 @@ export function useKpi(filters?: KpiFilters) {
       const response = await api.get('/kpi', { params });
       return response.data as { ok: boolean; data: KpiResponse };
     },
+    enabled: !!filters,
+    staleTime: 5 * 60 * 1000, // cache KPI for 5 minutes per filter
+    keepPreviousData: true, // keep previous KPI visible while switching filters
+    refetchOnWindowFocus: false,
+  });
+}
+
+
+export function useKpiBulk() {
+  return useQuery({
+    queryKey: ['kpi-bulk'],
+    queryFn: async () => {
+      // Backend will return all standard ranges in one shot.
+      const response = await api.get('/kpi/bulk');
+      return response.data as { ok: boolean; data: KpiBulkResponse };
+    },
+    staleTime: 5 * 60 * 1000, // cache for 5 minutes
+    refetchOnWindowFocus: false,
   });
 }
 

@@ -574,7 +574,7 @@ export default function ImageJobs() {
                 <th className="px-3 py-2 bg-[#d8efd9] border-t border-slate-200 border-r">Pose 1</th>
                 <th className="px-3 py-2 bg-[#d8efd9] border-t border-slate-200 border-r">Pose 2</th>
                 <th className="px-3 py-2 bg-[#d8efd9] border-t border-slate-200 border-r">Pose 3</th>
-                <th className="px-3 py-2 bg-[#d8efd9] border-t border-slate-200 border-r">Proc(e)</th>
+                <th className="px-3 py-2 bg-[#d8efd9] border-t border-slate-200 border-r">Process</th>
 
                 {/* Financials */}
                 <th className="px-3 py-2 bg-[#ead9fb] border-t border-slate-200 border-r">Error</th>

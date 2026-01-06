@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useState, useMemo, type CSSProperties } from 'react';
 import { KPICard } from '@/components/KPICard';
 import {
   Store,
@@ -13,42 +13,36 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useKpi, type PresetRange } from '@/hooks/useKpi';
+import { useKpi, useKpiBulk, type PresetRange, mapRangeToBackend } from '@/hooks/useKpi';
 
 type FixedRange =
-  | 'all'
   | 'today'
   | 'yesterday'
   | 'this-week'
   | 'last-week'
   | 'this-month'
-  | 'last-month';
+  | 'last-month'
+  | 'all';
 
 const fixedRangeLabels: Record<FixedRange, string> = {
-  all: 'All',
   today: 'Today',
   yesterday: 'Yesterday',
   'this-week': 'This Week',
   'last-week': 'Last Week',
   'this-month': 'This Month',
   'last-month': 'Last Month',
+  all: 'All',
 };
 
 const Index = () => {
-  const [dateRange, setDateRange] = useState<PresetRange>('all');
+  const [dateRange, setDateRange] = useState<PresetRange>('today');
   const [from, setFrom] = useState<string | undefined>();
   const [to, setTo] = useState<string | undefined>();
 
   const isCustom = dateRange === 'custom';
 
-  // Progressive prefetch: start with ALL, then chain each range once the previous is ready.
-  const allQuery = useKpi({ range: 'all' });
-  const todayQuery = useKpi(allQuery.isSuccess ? { range: 'today' } : undefined);
-  const yesterdayQuery = useKpi(todayQuery.isSuccess ? { range: 'yesterday' } : undefined);
-  const thisWeekQuery = useKpi(yesterdayQuery.isSuccess ? { range: 'this-week' } : undefined);
-  const lastWeekQuery = useKpi(thisWeekQuery.isSuccess ? { range: 'last-week' } : undefined);
-  const thisMonthQuery = useKpi(lastWeekQuery.isSuccess ? { range: 'this-month' } : undefined);
-  const lastMonthQuery = useKpi(thisMonthQuery.isSuccess ? { range: 'last-month' } : undefined);
+  // Use bulk fetch for all predefined ranges
+  const bulkQuery = useKpiBulk();
 
   // Custom range: only fetched on demand when selected and dates are provided.
   const customQuery = useKpi(
@@ -57,41 +51,25 @@ const Index = () => {
       : undefined,
   );
 
-  const queriesByFixedRange: Record<FixedRange, typeof allQuery> = {
-    all: allQuery,
-    today: todayQuery,
-    yesterday: yesterdayQuery,
-    'this-week': thisWeekQuery,
-    'last-week': lastWeekQuery,
-    'this-month': thisMonthQuery,
-    'last-month': lastMonthQuery,
-  };
+  const availableFixedRanges: FixedRange[] = [
+    'today',
+    'yesterday',
+    'this-week',
+    'last-week',
+    'this-month',
+    'last-month',
+    'all',
+  ];
 
-  // Build the list of available ranges based on which queries have finished successfully.
-  const availableFixedRanges: FixedRange[] = [];
-  (['all', 'today', 'yesterday', 'this-week', 'last-week', 'this-month', 'last-month'] as FixedRange[]).forEach(
-    (rk) => {
-      if (queriesByFixedRange[rk].isSuccess) {
-        availableFixedRanges.push(rk);
-      }
-    },
-  );
+  const hasData = bulkQuery.isSuccess;
 
-  // Only enable the dropdown once at least the 'all' range has been loaded.
-  const hasAnyOption = availableFixedRanges.length > 0;
+  const activeQueryData = useMemo(() => {
+    if (isCustom) return customQuery.data?.data;
+    if (!bulkQuery.data?.data?.by_range) return undefined;
 
-  // Ensure the currently selected range is actually available; otherwise fall back to first available.
-  const effectiveDateRange: PresetRange =
-    dateRange === 'custom'
-      ? 'custom'
-      : (hasAnyOption && availableFixedRanges.includes(dateRange as FixedRange)
-          ? dateRange
-          : (availableFixedRanges[0] ?? 'all'));
-
-  const activeQuery =
-    effectiveDateRange === 'custom'
-      ? customQuery
-      : queriesByFixedRange[effectiveDateRange as FixedRange] ?? allQuery;
+    const backendKey = mapRangeToBackend(dateRange) || 'TODAY';
+    return bulkQuery.data.data.by_range[backendKey];
+  }, [dateRange, isCustom, bulkQuery.data, customQuery.data]);
 
   const defaultKpi = {
     stores_total: 0,
@@ -126,7 +104,7 @@ const Index = () => {
     jobs_total: 0,
   };
 
-  const r = activeQuery.data?.data ?? defaultKpi;
+  const r = activeQueryData ?? defaultKpi;
 
   const formatNumber = (n: number | null | undefined) =>
     (n ?? 0).toLocaleString('en-US');
@@ -191,7 +169,7 @@ const Index = () => {
 
             <div className="flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 shadow-sm">
               <Select
-                value={effectiveDateRange}
+                value={dateRange}
                 onValueChange={(v) => {
                   setDateRange(v as PresetRange);
                   if (v !== 'custom') {
@@ -199,10 +177,9 @@ const Index = () => {
                     setTo(undefined);
                   }
                 }}
-                disabled={!hasAnyOption}
               >
                 <SelectTrigger className="h-6 w-[220px] border-0 bg-transparent p-0 text-xs shadow-none focus:ring-0">
-                  <SelectValue placeholder="Loading..." />
+                  <SelectValue placeholder={bulkQuery.isLoading ? "Loading..." : "Select Range"} />
                 </SelectTrigger>
                 <SelectContent>
                   {availableFixedRanges.map((rk) => (
@@ -211,7 +188,7 @@ const Index = () => {
                     </SelectItem>
                   ))}
                   {/* Allow custom once we have at least one base KPI (ALL) */}
-                  {hasAnyOption && (
+                  {hasData && (
                     <SelectItem value="custom">Custom Range</SelectItem>
                   )}
                 </SelectContent>

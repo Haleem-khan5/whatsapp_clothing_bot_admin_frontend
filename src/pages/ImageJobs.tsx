@@ -19,6 +19,60 @@ export default function ImageJobs() {
   const [searchQuery, setSearchQuery] = useState('');
   const [range, setRange] = useState<'today' | 'yesterday' | 'this_week' | 'this_month' | 'all'>('this_week');
 
+  const toIso = (d: Date) => {
+    const year = d.getFullYear();
+    const month = `${d.getMonth() + 1}`.padStart(2, '0');
+    const day = `${d.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleRangeChange = (newRange: typeof range) => {
+    setRange(newRange);
+    const today = new Date();
+
+    if (newRange === 'all') {
+      setFrom(undefined);
+      setTo(undefined);
+      return;
+    }
+
+    if (newRange === 'today') {
+      const start = new Date(today);
+      const end = new Date(today);
+      setFrom(toIso(start));
+      setTo(toIso(end));
+      return;
+    }
+
+    if (newRange === 'yesterday') {
+      const y = new Date(today);
+      y.setDate(today.getDate() - 1);
+      setFrom(toIso(y));
+      setTo(toIso(y));
+      return;
+    }
+
+    if (newRange === 'this_week') {
+      const start = new Date(today);
+      const day = (start.getDay() + 6) % 7;
+      start.setDate(start.getDate() - day);
+      setFrom(toIso(start));
+      setTo(toIso(today));
+      return;
+    }
+
+    if (newRange === 'this_month') {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      setFrom(toIso(start));
+      setTo(toIso(today));
+    }
+  };
+
+  // On mount, set initial dates based on the default range (this_week)
+  useEffect(() => {
+    handleRangeChange('this_week');
+  }, []);
+
   const { data, isLoading } = useImageJobs({ ...filters, store_id: storeId, from, to });
   const { data: storesResp } = useStores();
   const { data: commonResp } = useCommonThings();
@@ -41,57 +95,6 @@ export default function ImageJobs() {
       setExchangeInput(String(currentExchangeRate));
     }
   }, [currentExchangeRate]);
-
-  // When range changes (Today / Yesterday / This Week / This Month / All), auto-set the from/to date filters.
-  useEffect(() => {
-    const toIso = (d: Date) => {
-      const year = d.getFullYear();
-      const month = `${d.getMonth() + 1}`.padStart(2, '0');
-      const day = `${d.getDate()}`.padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-
-    const today = new Date();
-
-    if (range === 'all') {
-      // Clear date filters to show all jobs
-      setFrom(undefined);
-      setTo(undefined);
-      return;
-    }
-
-    if (range === 'today') {
-      const start = new Date(today);
-      const end = new Date(today);
-      setFrom(toIso(start));
-      setTo(toIso(end));
-      return;
-    }
-
-    if (range === 'yesterday') {
-      const y = new Date(today);
-      y.setDate(today.getDate() - 1);
-      setFrom(toIso(y));
-      setTo(toIso(y));
-      return;
-    }
-
-    if (range === 'this_week') {
-      // Monday as start of week
-      const start = new Date(today);
-      const day = (start.getDay() + 6) % 7; // 0 = Monday
-      start.setDate(start.getDate() - day);
-      setFrom(toIso(start));
-      setTo(toIso(today));
-      return;
-    }
-
-    if (range === 'this_month') {
-      const start = new Date(today.getFullYear(), today.getMonth(), 1);
-      setFrom(toIso(start));
-      setTo(toIso(today));
-    }
-  }, [range]);
 
   // Store metadata lookup: name, credits/job, resolution, effective package.
   const storeMeta = useMemo(() => {
@@ -481,7 +484,7 @@ export default function ImageJobs() {
         {/* Top control bar (filters, search, export) */}
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
           {/* Search */}
-          <div className="relative w-full md:w-[320px]">
+          <div className="relative w-full md:w-[280px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
             <input
               value={searchQuery}
@@ -491,12 +494,32 @@ export default function ImageJobs() {
             />
           </div>
 
+          {/* Store filter */}
+          <div className="flex items-center gap-2">
+            <div className="text-sm text-slate-700">Store:</div>
+            <Select value={storeId ?? '__ALL__'} onValueChange={(v) => setStoreId(v === '__ALL__' ? undefined : v)}>
+              <SelectTrigger className="h-9 w-[180px] rounded-md border border-slate-300 bg-white text-sm shadow-[inset_0_1px_0_rgba(0,0,0,0.03)]">
+                <SelectValue placeholder="All stores" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__ALL__">All stores</SelectItem>
+                {(storesResp?.data || []).map((s: any) => (
+                  <SelectItem key={s.store_id} value={s.store_id}>
+                    {s.store_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Range dropdown */}
-          <Select value={range} onValueChange={(v: any) => setRange(v)}>
+          <Select value={range} onValueChange={(v: any) => handleRangeChange(v)}>
             <SelectTrigger className="h-9 w-[140px] rounded-md border border-slate-300 bg-white text-sm shadow-[inset_0_1px_0_rgba(0,0,0,0.03)]">
               <SelectValue placeholder="This Week" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="yesterday">Yesterday</SelectItem>
               <SelectItem value="this_week">This Week</SelectItem>
               <SelectItem value="this_month">This Month</SelectItem>
               <SelectItem value="all">All</SelectItem>
@@ -511,7 +534,12 @@ export default function ImageJobs() {
               <input
                 type="date"
                 value={from || ''}
-                onChange={(e) => setFrom(e.target.value || undefined)}
+                onChange={(e) => {
+                  setFrom(e.target.value || undefined);
+                  // When manually changing dates, we're effectively in a "custom" range.
+                  // Setting it to 'all' allows re-selecting 'this_week' later.
+                  if (range !== 'all') setRange('all');
+                }}
                 className="h-9 w-[150px] rounded-md border border-slate-300 bg-white pl-8 pr-2 text-sm shadow-[inset_0_1px_0_rgba(0,0,0,0.03)] focus:outline-none focus:ring-2 focus:ring-slate-200"
               />
             </div>
@@ -525,7 +553,10 @@ export default function ImageJobs() {
               <input
                 type="date"
                 value={to || ''}
-                onChange={(e) => setTo(e.target.value || undefined)}
+                onChange={(e) => {
+                  setTo(e.target.value || undefined);
+                  if (range !== 'all') setRange('all');
+                }}
                 className="h-9 w-[150px] rounded-md border border-slate-300 bg-white pl-8 pr-2 text-sm shadow-[inset_0_1px_0_rgba(0,0,0,0.03)] focus:outline-none focus:ring-2 focus:ring-slate-200"
               />
             </div>
@@ -700,24 +731,6 @@ export default function ImageJobs() {
             </tbody>
           </table>
           </div>
-        </div>
-
-        {/* Store filter (kept functional, aligned under table) */}
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
-          <span className="text-slate-700">Store:</span>
-          <Select value={storeId ?? '__ALL__'} onValueChange={(v) => setStoreId(v === '__ALL__' ? undefined : v)}>
-            <SelectTrigger className="h-9 w-[220px] rounded-md border border-slate-300 bg-white text-sm">
-              <SelectValue placeholder="All stores" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__ALL__">All stores</SelectItem>
-              {(storesResp?.data || []).map((s: any) => (
-                <SelectItem key={s.store_id} value={s.store_id}>
-                  {s.store_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
   );
